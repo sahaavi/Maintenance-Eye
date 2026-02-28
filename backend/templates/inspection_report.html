@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inspection Report — {{ report.report_id }}</title>
+    <style>
+        /* ================================================
+           Maintenance-Eye — Inspection Report Styles
+           Designed for both screen viewing and PDF export
+           ================================================ */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        :root {
+            --primary: #0f172a;
+            --accent: #06b6d4;
+            --accent-dark: #0891b2;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --bg-light: #f8fafc;
+            --danger: #ef4444;
+            --warning: #f97316;
+            --caution: #eab308;
+            --success: #22c55e;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            color: var(--text);
+            line-height: 1.6;
+            background: white;
+        }
+
+        .page {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+        }
+
+        @media print {
+            .page {
+                padding: 20px;
+                max-width: 100%;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* ---- Header ---- */
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding-bottom: 24px;
+            border-bottom: 3px solid var(--accent);
+            margin-bottom: 32px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 18px;
+        }
+
+        .brand-name {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .brand-name span {
+            color: var(--accent);
+        }
+
+        .report-meta {
+            text-align: right;
+            font-size: 13px;
+            color: var(--text-light);
+        }
+
+        .report-meta strong {
+            color: var(--text);
+            display: block;
+            font-size: 14px;
+        }
+
+        /* ---- Title ---- */
+        .report-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .report-subtitle {
+            font-size: 14px;
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        /* ---- Cards ---- */
+        .section {
+            margin-bottom: 28px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--primary);
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .info-item {
+            padding: 12px 16px;
+            background: var(--bg-light);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .info-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        /* ---- Condition Badge ---- */
+        .condition-badge {
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .condition-good {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .condition-requires_attention {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+
+        .condition-requires_immediate_action {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .condition-out_of_service {
+            background: #1e293b;
+            color: #f1f5f9;
+        }
+
+        /* ---- Findings ---- */
+        .findings-text {
+            font-size: 14px;
+            line-height: 1.8;
+            padding: 16px;
+            background: var(--bg-light);
+            border-left: 4px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+        }
+
+        /* ---- WO Table ---- */
+        .wo-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .wo-table th {
+            text-align: left;
+            padding: 10px 12px;
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .wo-table th:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        .wo-table th:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        .wo-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .wo-table tr:nth-child(even) td {
+            background: var(--bg-light);
+        }
+
+        .priority-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .priority-P1 {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .priority-P2 {
+            background: #ffedd5;
+            color: var(--warning);
+        }
+
+        .priority-P3 {
+            background: #fef9c3;
+            color: var(--caution);
+        }
+
+        .priority-P4 {
+            background: #dcfce7;
+            color: var(--success);
+        }
+
+        /* ---- Recommendation ---- */
+        .recommendation {
+            padding: 16px;
+            background: linear-gradient(135deg, #ecfeff, #eff6ff);
+            border: 1px solid #a5f3fc;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .recommendation strong {
+            color: var(--accent-dark);
+        }
+
+        /* ---- Footer ---- */
+        .report-footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: var(--text-light);
+        }
+
+        .signature-line {
+            border-top: 1px solid var(--text-light);
+            padding-top: 4px;
+            min-width: 200px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <!-- Header -->
+        <div class="report-header">
+            <div class="brand">
+                <div class="brand-logo">M</div>
+                <div class="brand-name">Maintenance<span>Eye</span></div>
+            </div>
+            <div class="report-meta">
+                <strong>{{ report.report_id }}</strong>
+                {{ report.generated_at[:10] if report.generated_at else "N/A" }}
+            </div>
+        </div>
+
+        <!-- Title -->
+        <h1 class="report-title">Inspection Report</h1>
+        <p class="report-subtitle">
+            Asset: {{ asset_name }} ({{ report.asset.asset_id | default("N/A") }})
+            · Inspector: {{ report.inspector }}
+        </p>
+
+        <!-- Overall Condition -->
+        <div class="section">
+            <div class="section-title">Overall Condition</div>
+            <span class="condition-badge condition-{{ report.overall_condition }}">
+                {{ report.overall_condition | replace("_", " ") }}
+            </span>
+        </div>
+
+        <!-- Asset Details -->
+        <div class="section">
+            <div class="section-title">Asset Information</div>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">Asset ID</div>
+                    <div class="info-value">{{ report.asset.asset_id | default("N/A") }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Name</div>
+                    <div class="info-value">{{ asset_name }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Type</div>
+                    <div class="info-value">{{ report.asset.asset_type | default("N/A") }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Location</div>
+                    <div class="info-value">{{ report.asset.location | default("N/A") }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Department</div>
+                    <div class="info-value">{{ report.asset.department | default("N/A") }}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Station</div>
+                    <div class="info-value">{{ report.asset.station | default("N/A") }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Findings -->
+        <div class="section">
+            <div class="section-title">Findings Summary</div>
+            <div class="findings-text">
+                {{ report.findings_summary | default("No findings recorded.") }}
+            </div>
+        </div>
+
+        <!-- Open Work Orders -->
+        {% if work_orders %}
+        <div class="section">
+            <div class="section-title">Open Work Orders ({{ work_orders | length }})</div>
+            <table class="wo-table">
+                <thead>
+                    <tr>
+                        <th>WO ID</th>
+                        <th>Description</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for wo in work_orders %}
+                    <tr>
+                        <td><strong>{{ wo.wo_id | default("—") }}</strong></td>
+                        <td>{{ wo.description | default("—") }}</td>
+                        <td>
+                            <span class="priority-tag priority-{{ wo.priority | default('P3') }}">
+                                {{ wo.priority | default("P3") }}
+                            </span>
+                        </td>
+                        <td>{{ wo.status | default("—") }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Recommendation -->
+        <div class="section">
+            <div class="section-title">Next Steps</div>
+            <div class="recommendation">
+                <strong>📅 Next Inspection:</strong>
+                {{ report.next_inspection_recommendation | default("Follow standard schedule") }}
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="report-footer">
+            <div>
+                <div>Generated by MaintenanceEye AI</div>
+                <div>{{ report.generated_at | default("") }}</div>
+            </div>
+            <div class="signature-line">
+                Inspector Signature
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

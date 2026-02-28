@@ -1,0 +1,15 @@
+{
+    "firestore": {
+        "rules": "firestore.rules"
+    },
+    "emulators": {
+        "firestore": {
+            "port": 8081,
+            "host": "0.0.0.0"
+        },
+        "ui": {
+            "enabled": true,
+            "port": 4000
+        }
+    }
+}

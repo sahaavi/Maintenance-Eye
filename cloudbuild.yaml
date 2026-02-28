@@ -1,0 +1,66 @@
+# Cloud Build — Automated CI/CD for Maintenance-Eye
+# Builds Docker image, pushes to Artifact Registry, deploys to Cloud Run.
+#
+# Trigger: Push to main branch (or manual)
+# Usage:  gcloud builds submit --config=cloudbuild.yaml \
+#           --substitutions=_GEMINI_API_KEY="your-key"
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: maintenance-eye
+  _REPO_NAME: maintenance-eye
+  _GEMINI_API_KEY: ""
+  _TAG: latest
+
+steps:
+  # Step 1: Build Docker image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/backend:${_TAG}"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/backend:latest"
+      - "."
+
+  # Step 2: Push to Artifact Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/backend"
+
+  # Step 3: Deploy to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "${_SERVICE_NAME}"
+      - "--image"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/backend:${_TAG}"
+      - "--region"
+      - "${_REGION}"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--port"
+      - "8080"
+      - "--cpu"
+      - "2"
+      - "--memory"
+      - "1Gi"
+      - "--min-instances"
+      - "0"
+      - "--max-instances"
+      - "3"
+      - "--set-env-vars"
+      - "GCP_PROJECT_ID=${PROJECT_ID},GCP_REGION=${_REGION},GEMINI_API_KEY=${_GEMINI_API_KEY},GOOGLE_API_KEY=${_GEMINI_API_KEY},APP_ENV=production"
+
+images:
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/backend:${_TAG}"
+  - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/backend:latest"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+

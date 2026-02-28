@@ -26,6 +26,11 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+# Agents
+.agents/
+.gemini/
+.geminiignore
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -205,3 +210,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/terraform.tfvars
+terraform/.terraform.lock.hcl

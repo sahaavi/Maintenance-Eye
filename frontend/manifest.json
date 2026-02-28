@@ -1,0 +1,17 @@
+{
+    "name": "Maintenance-Eye",
+    "short_name": "MaintEye",
+    "description": "AI Co-Pilot for Physical Infrastructure Maintenance Operations",
+    "start_url": "/",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a",
+    "icons": [
+        {
+            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><circle cx='24' cy='24' r='22' stroke='%2306b6d4' stroke-width='2.5' fill='none'/><circle cx='24' cy='24' r='4' fill='%2306b6d4'/></svg>",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
+}

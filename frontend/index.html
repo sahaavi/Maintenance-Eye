@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="AI Co-Pilot for Physical Infrastructure Maintenance Operations">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <title>Maintenance-Eye | AI Inspection Co-Pilot</title>
+
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+
+<body>
+    <!-- ==================== SPLASH / CONNECT SCREEN ==================== -->
+    <div id="splash-screen" class="screen active">
+        <div class="splash-content">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="24" cy="24" r="22" stroke="url(#logo-gradient)" stroke-width="2.5" />
+                        <path d="M24 14C18.48 14 14 18.48 14 24C14 29.52 18.48 34 24 34C29.52 34 34 29.52 34 24"
+                            stroke="url(#logo-gradient)" stroke-width="2" stroke-linecap="round" />
+                        <circle cx="24" cy="24" r="4" fill="url(#logo-gradient)" />
+                        <path d="M34 14L34 24" stroke="url(#logo-gradient)" stroke-width="2" stroke-linecap="round" />
+                        <path d="M34 14L28 14" stroke="url(#logo-gradient)" stroke-width="2" stroke-linecap="round" />
+                        <defs>
+                            <linearGradient id="logo-gradient" x1="0" y1="0" x2="48" y2="48">
+                                <stop stop-color="#06b6d4" />
+                                <stop offset="1" stop-color="#3b82f6" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1 class="logo-text">Maintenance<span class="accent">Eye</span></h1>
+                <p class="logo-tagline">AI Co-Pilot for Infrastructure Maintenance</p>
+            </div>
+
+            <button id="btn-start" class="btn-primary" onclick="startInspection()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                </svg>
+                Start Inspection
+            </button>
+
+            <button id="btn-dashboard" class="btn-secondary" onclick="showDashboard()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                Browse Data
+            </button>
+
+            <div class="status-bar" id="connection-status">
+                <span class="status-dot"></span>
+                <span>Ready to connect</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== DASHBOARD SCREEN ==================== -->
+    <div id="dashboard-screen" class="screen">
+        <div id="dashboard-header">
+            <button id="btn-back" class="btn-icon" onclick="hideDashboard()" title="Go back">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                </svg>
+            </button>
+            <h2 class="dashboard-title">Data Explorer</h2>
+        </div>
+
+        <div id="dashboard-tabs">
+            <button class="tab-btn active" data-tab="assets" onclick="switchTab('assets')">Assets</button>
+            <button class="tab-btn" data-tab="work-orders" onclick="switchTab('work-orders')">Work Orders</button>
+            <button class="tab-btn" data-tab="knowledge" onclick="switchTab('knowledge')">Knowledge</button>
+            <button class="tab-btn" data-tab="eam-codes" onclick="switchTab('eam-codes')">EAM Codes</button>
+        </div>
+
+        <div id="dashboard-search">
+            <input type="text" id="search-input" placeholder="Search..." oninput="debounceSearch()">
+        </div>
+
+        <div id="dashboard-content">
+            <div id="data-loading" class="data-loading" style="display:none;">
+                <div class="spinner"></div>
+                <span>Loading...</span>
+            </div>
+            <div id="data-grid" class="data-grid"></div>
+            <div id="data-empty" class="data-empty" style="display:none;">
+                <p>No results found</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== INSPECTION SCREEN ==================== -->
+    <div id="inspection-screen" class="screen">
+        <!-- Camera Feed -->
+        <div id="camera-container">
+            <video id="camera-feed" autoplay playsinline muted></video>
+            <div id="camera-overlay">
+                <div class="scan-line"></div>
+            </div>
+        </div>
+
+        <!-- Top Bar -->
+        <div id="top-bar">
+            <div class="top-bar-left">
+                <button id="btn-back" class="btn-icon" onclick="endInspection()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                </button>
+                <div class="session-info">
+                    <span id="session-asset" class="session-asset">No asset selected</span>
+                    <span id="session-timer" class="session-timer">00:00</span>
+                </div>
+            </div>
+            <div class="top-bar-right">
+                <div class="recording-indicator" id="recording-indicator">
+                    <span class="rec-dot"></span>
+                    LIVE
+                </div>
+            </div>
+        </div>
+
+        <!-- Agent Response Panel (bottom overlay) -->
+        <div id="agent-panel">
+            <div id="agent-header">
+                <div class="agent-avatar">
+                    <span>M</span>
+                </div>
+                <div class="agent-info">
+                    <span class="agent-name">Max</span>
+                    <span class="agent-status" id="agent-status">Listening...</span>
+                </div>
+                <button class="btn-icon btn-expand" id="btn-expand-panel" onclick="togglePanel()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 15l-6-6-6 6" />
+                    </svg>
+                </button>
+            </div>
+
+            <div id="agent-messages" class="agent-messages">
+                <div class="message agent-message">
+                    <p>Ready for inspection. What equipment are we looking at today?</p>
+                </div>
+            </div>
+
+            <!-- Findings Cards -->
+            <div id="findings-container" class="findings-container"></div>
+
+            <!-- Confirmation Cards (Human-in-the-Loop) -->
+            <div id="confirmation-container" class="confirmation-container"></div>
+        </div>
+
+        <!-- Bottom Controls -->
+        <div id="bottom-controls">
+            <button id="btn-mic" class="btn-control btn-mic active" onclick="toggleMic()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" y1="19" x2="12" y2="23" />
+                    <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+            </button>
+            <button id="btn-capture" class="btn-control btn-capture" onclick="capturePhoto()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="4" fill="currentColor" />
+                </svg>
+            </button>
+            <button id="btn-report" class="btn-control btn-report" onclick="requestReport()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14,2 14,8 20,8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script src="app.js?v=2"></script>
+</body>
+
+</html>

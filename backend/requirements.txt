@@ -1,0 +1,17 @@
+# Core
+fastapi
+uvicorn[standard]
+websockets
+python-dotenv
+pydantic
+
+# Google Cloud
+google-cloud-firestore
+google-cloud-storage
+google-genai
+google-adk
+
+# Utilities
+jinja2
+weasyprint
+python-multipart
