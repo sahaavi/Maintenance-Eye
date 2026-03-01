@@ -23,14 +23,16 @@ class Settings:
     # Gemini
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     GEMINI_LIVE_MODEL: str = os.getenv(
-        "GEMINI_LIVE_MODEL", "gemini-live-2.5-flash-native-audio"
+        "GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"
     )
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
     def __init__(self):
         # ADK / genai client reads GOOGLE_API_KEY from env
-        if self.GEMINI_API_KEY and not os.getenv("GOOGLE_API_KEY"):
+        # Set (or overwrite) so only one key is active, avoiding the dual-key warning
+        if self.GEMINI_API_KEY:
             os.environ["GOOGLE_API_KEY"] = self.GEMINI_API_KEY
+            os.environ.pop("GEMINI_API_KEY", None)
         # Firestore client library reads FIRESTORE_EMULATOR_HOST from os.environ
         if self.FIRESTORE_EMULATOR_HOST and not os.getenv("FIRESTORE_EMULATOR_HOST"):
             os.environ["FIRESTORE_EMULATOR_HOST"] = self.FIRESTORE_EMULATOR_HOST
@@ -41,6 +43,11 @@ class Settings:
 
     # Cloud Storage
     GCS_BUCKET: str = os.getenv("GCS_BUCKET", "maintenance-eye-storage")
+
+    # Firebase Auth / Security
+    FIREBASE_PROJECT_ID: str = os.getenv("FIREBASE_PROJECT_ID", "")
+    ENABLE_AUTH: bool = os.getenv("ENABLE_AUTH", "").lower() in {"1", "true", "yes"}
+    ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
 
     # App
     APP_ENV: str = os.getenv("APP_ENV", "development")
@@ -55,6 +62,27 @@ class Settings:
     def use_emulator(self) -> bool:
         """Check if we should use the Firestore emulator."""
         return bool(self.FIRESTORE_EMULATOR_HOST)
+
+    @property
+    def auth_enabled(self) -> bool:
+        """Enable auth by default in production unless explicitly disabled."""
+        if os.getenv("ENABLE_AUTH") is None:
+            return self.APP_ENV == "production"
+        return self.ENABLE_AUTH
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parse configured CORS origins."""
+        if self.ALLOWED_ORIGINS.strip():
+            return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        if self.APP_ENV == "production":
+            return []
+        return [
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
 
 
 settings = Settings()

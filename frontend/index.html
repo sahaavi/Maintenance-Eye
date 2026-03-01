@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 
 <body>
@@ -62,6 +62,8 @@
                 Browse Data
             </button>
 
+            <div id="splash-status" class="splash-status" style="display:none;"></div>
+
             <div class="status-bar" id="connection-status">
                 <span class="status-dot"></span>
                 <span>Ready to connect</span>
@@ -71,36 +73,149 @@
 
     <!-- ==================== DASHBOARD SCREEN ==================== -->
     <div id="dashboard-screen" class="screen">
-        <div id="dashboard-header">
+        <!-- Top Header Bar -->
+        <div id="dash-topbar">
             <button id="btn-back" class="btn-icon" onclick="hideDashboard()" title="Go back">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
             </button>
             <h2 class="dashboard-title">Data Explorer</h2>
+            <span class="env-badge">DEMO</span>
         </div>
 
-        <div id="dashboard-tabs">
-            <button class="tab-btn active" data-tab="assets" onclick="switchTab('assets')">Assets</button>
-            <button class="tab-btn" data-tab="work-orders" onclick="switchTab('work-orders')">Work Orders</button>
-            <button class="tab-btn" data-tab="knowledge" onclick="switchTab('knowledge')">Knowledge</button>
-            <button class="tab-btn" data-tab="eam-codes" onclick="switchTab('eam-codes')">EAM Codes</button>
-        </div>
+        <div id="dash-layout">
+            <!-- Sidebar Nav (desktop) -->
+            <nav id="dash-sidebar">
+                <button class="nav-item active" data-page="work-orders" onclick="navigateTo('work-orders')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+                    <span>Work Orders</span>
+                </button>
+                <button class="nav-item" data-page="assets" onclick="navigateTo('assets')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 6V2M6 6V4M18 6V4"/></svg>
+                    <span>Assets</span>
+                </button>
+                <button class="nav-item" data-page="locations" onclick="navigateTo('locations')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <span>Locations</span>
+                </button>
+                <button class="nav-item" data-page="knowledge" onclick="navigateTo('knowledge')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+                    <span>Knowledge Base</span>
+                </button>
+                <button class="nav-item" data-page="eam-codes" onclick="navigateTo('eam-codes')">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
+                    <span>EAM Codes</span>
+                </button>
+            </nav>
 
-        <div id="dashboard-search">
-            <input type="text" id="search-input" placeholder="Search..." oninput="debounceSearch()">
-        </div>
+            <!-- Main Content Area -->
+            <div id="dash-main">
+                <!-- Work Orders Page -->
+                <div class="dash-page active" id="page-work-orders">
+                    <h3 class="page-title">Work Orders</h3>
+                    <div class="filter-bar">
+                        <input type="text" class="filter-search" id="wo-search" placeholder="Search WO#, description, asset, EAM code..." oninput="debouncePageSearch('work-orders')">
+                        <div class="filter-group">
+                            <select id="wo-filter-status" class="filter-select" onchange="loadWorkOrders()"><option value="">All Statuses</option></select>
+                            <select id="wo-filter-priority" class="filter-select" onchange="loadWorkOrders()"><option value="">All Priorities</option></select>
+                            <select id="wo-filter-department" class="filter-select" onchange="loadWorkOrders()"><option value="">All Departments</option></select>
+                            <select id="wo-filter-location" class="filter-select" onchange="loadWorkOrders()"><option value="">All Locations</option></select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
+                        <div class="dash-empty" style="display:none;"><p>No work orders found</p></div>
+                        <table class="data-table" id="wo-table" style="display:none;">
+                            <thead><tr><th>WO #</th><th>Priority</th><th>Description</th><th>Asset</th><th>Status</th><th>Problem Code</th><th>Created</th></tr></thead>
+                            <tbody id="wo-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
 
-        <div id="dashboard-content">
-            <div id="data-loading" class="data-loading" style="display:none;">
-                <div class="spinner"></div>
-                <span>Loading...</span>
+                <!-- Assets Page -->
+                <div class="dash-page" id="page-assets">
+                    <h3 class="page-title">Assets</h3>
+                    <div class="filter-bar">
+                        <input type="text" class="filter-search" id="asset-search" placeholder="Search assets..." oninput="debouncePageSearch('assets')">
+                        <div class="filter-group">
+                            <select id="asset-filter-department" class="filter-select" onchange="loadAssets()"><option value="">All Departments</option></select>
+                            <select id="asset-filter-type" class="filter-select" onchange="loadAssets()"><option value="">All Types</option></select>
+                            <select id="asset-filter-station" class="filter-select" onchange="loadAssets()"><option value="">All Stations</option></select>
+                        </div>
+                    </div>
+                    <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
+                    <div class="dash-empty" style="display:none;"><p>No assets found</p></div>
+                    <div class="data-grid" id="asset-grid"></div>
+                </div>
+
+                <!-- Locations Page -->
+                <div class="dash-page" id="page-locations">
+                    <h3 class="page-title">Locations</h3>
+                    <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
+                    <div class="dash-empty" style="display:none;"><p>No locations found</p></div>
+                    <div id="locations-list" class="locations-list"></div>
+                </div>
+
+                <!-- Knowledge Base Page -->
+                <div class="dash-page" id="page-knowledge">
+                    <h3 class="page-title">Knowledge Base</h3>
+                    <div class="filter-bar">
+                        <input type="text" class="filter-search" id="kb-search" placeholder="Search knowledge base..." oninput="debouncePageSearch('knowledge')">
+                        <div class="filter-group">
+                            <select id="kb-filter-department" class="filter-select" onchange="loadKnowledge()"><option value="">All Departments</option></select>
+                        </div>
+                    </div>
+                    <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
+                    <div class="dash-empty" style="display:none;"><p>No articles found</p></div>
+                    <div class="data-grid" id="kb-grid"></div>
+                </div>
+
+                <!-- EAM Codes Page -->
+                <div class="dash-page" id="page-eam-codes">
+                    <h3 class="page-title">EAM Codes</h3>
+                    <div class="filter-bar">
+                        <input type="text" class="filter-search" id="eam-search" placeholder="Search EAM codes..." oninput="debouncePageSearch('eam-codes')">
+                        <div class="filter-group">
+                            <select id="eam-filter-type" class="filter-select" onchange="loadEAMCodes()"><option value="">All Types</option></select>
+                            <select id="eam-filter-department" class="filter-select" onchange="loadEAMCodes()"><option value="">All Departments</option></select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
+                        <div class="dash-empty" style="display:none;"><p>No EAM codes found</p></div>
+                        <table class="data-table" id="eam-table" style="display:none;">
+                            <thead><tr><th>Code</th><th>Type</th><th>Description</th><th>Department</th><th>Asset Types</th></tr></thead>
+                            <tbody id="eam-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
-            <div id="data-grid" class="data-grid"></div>
-            <div id="data-empty" class="data-empty" style="display:none;">
-                <p>No results found</p>
-            </div>
         </div>
+
+        <!-- Mobile Bottom Nav -->
+        <nav id="dash-bottom-nav">
+            <button class="bnav-item active" data-page="work-orders" onclick="navigateTo('work-orders')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
+                <span>Orders</span>
+            </button>
+            <button class="bnav-item" data-page="assets" onclick="navigateTo('assets')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M12 6V2"/></svg>
+                <span>Assets</span>
+            </button>
+            <button class="bnav-item" data-page="locations" onclick="navigateTo('locations')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <span>Locations</span>
+            </button>
+            <button class="bnav-item" data-page="knowledge" onclick="navigateTo('knowledge')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+                <span>KB</span>
+            </button>
+            <button class="bnav-item" data-page="eam-codes" onclick="navigateTo('eam-codes')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>
+                <span>EAM</span>
+            </button>
+        </nav>
     </div>
 
     <!-- ==================== INSPECTION SCREEN ==================== -->
@@ -111,12 +226,40 @@
             <div id="camera-overlay">
                 <div class="scan-line"></div>
             </div>
+
+            <!-- HUD Overlay -->
+            <div id="hud-overlay">
+                <div class="hud-corner hud-tl"></div>
+                <div class="hud-corner hud-tr"></div>
+                <div class="hud-corner hud-bl"></div>
+                <div class="hud-corner hud-br"></div>
+
+                <div class="hud-crosshair"></div>
+
+                <div class="hud-data-left">
+                    <div class="hud-v-line"></div>
+                    <span>LAT: 49.2827</span>
+                    <span>LNG: -123.1207</span>
+                    <span>ALT: 42m</span>
+                    <div class="hud-v-line"></div>
+                </div>
+
+                <div class="hud-data-right">
+                    <div class="hud-v-line"></div>
+                    <span>FPS: 30</span>
+                    <span>RES: 720P</span>
+                    <span>BIT: 2.4Mb</span>
+                    <div class="hud-v-line"></div>
+                </div>
+
+                <div class="hud-scanning-text">AI SCANNING...</div>
+            </div>
         </div>
 
         <!-- Top Bar -->
         <div id="top-bar">
             <div class="top-bar-left">
-                <button id="btn-back" class="btn-icon" onclick="endInspection()">
+                <button id="btn-back-inspection" class="btn-icon" onclick="endInspection()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M19 12H5M12 19l-7-7 7-7" />
                     </svg>
@@ -191,7 +334,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=2"></script>
+    <script src="app.js?v=4"></script>
 </body>
 
 </html>

@@ -55,33 +55,35 @@ def add_bug(description, severity, component, impact):
                         lines.insert(j + 1, new_row)
                         break
                 break
-        content = "
-".join(lines)
+        content = "\n".join(lines)
     else:
-        content += f"
-
-{section_header}
-
-| ID | Component | Issue | Impact |
-|:---|:---|:---|:---|
-{new_row}"
+        content += (
+            f"\n\n{section_header}\n\n"
+            "| ID | Component | Issue | Impact |\n"
+            "|:---|:---|:---|:---|\n"
+            f"{new_row}"
+        )
 
     # Update total count
-    content = re.sub(r"\*\*Total Issues\*\*: \d+", f"**Total Issues**: {len(re.findall(r'\| \*\*.*-\d+\*\* \|', content))}", content)
+    total_issues = len(re.findall(r"\| \*\*.*-\d+\*\* \|", content))
+    content = re.sub(r"\*\*Total Issues\*\*: \d+", f"**Total Issues**: {total_issues}", content)
     
     save_bug_report(content)
     print(f"Added bug {bug_id} to BUG_REPORT.md")
 
 def update_status(bug_id, status):
     content = load_bug_report()
-    # This is a simple implementation that just adds a (Fixed) note or similar
-    # In a more advanced version, we could move items to a "Resolved" section
-    if bug_id in content:
-        content = content.replace(f"**{bug_id}**", f"**{bug_id}** ({status})")
-        save_bug_report(content)
-        print(f"Updated status for {bug_id} to {status}")
-    else:
+    escaped_bug_id = re.escape(bug_id)
+    pattern = re.compile(rf"\*\*{escaped_bug_id}\*\*(?:\s+\([^)]+\))?")
+
+    if not pattern.search(content):
         print(f"Bug ID {bug_id} not found.")
+        return
+
+    replacement = f"**{bug_id}** ({status})"
+    updated_content = pattern.sub(replacement, content, count=1)
+    save_bug_report(updated_content)
+    print(f"Updated status for {bug_id} to {status}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Manage Maintenance-Eye bugs.")

@@ -3,9 +3,7 @@ Work Order Management Tool
 ADK tool function for creating and updating maintenance work orders.
 """
 
-import asyncio
 import logging
-from typing import Optional
 
 from models.schemas import WorkOrder, Priority, WorkOrderStatus
 from services.firestore_eam import get_eam_service
@@ -13,7 +11,17 @@ from services.firestore_eam import get_eam_service
 logger = logging.getLogger("maintenance-eye.tools.work_order")
 
 
-def manage_work_order(
+def _parse_priority(priority: str) -> Priority:
+    value = (priority or "").strip().upper()
+    return Priority(value)
+
+
+def _parse_work_order_status(status: str) -> WorkOrderStatus:
+    value = (status or "").strip().lower()
+    return WorkOrderStatus(value)
+
+
+async def manage_work_order(
     action: str,
     asset_id: str = "",
     wo_id: str = "",
@@ -22,7 +30,7 @@ def manage_work_order(
     fault_code: str = "",
     action_code: str = "",
     failure_class: str = "",
-    priority: str = "P3",
+    priority: str = "",
     assigned_to: str = "",
     notes: str = "",
     status: str = "",
@@ -52,6 +60,12 @@ def manage_work_order(
 
     try:
         if action == "create":
+            try:
+                resolved_priority = _parse_priority(priority or "P3")
+            except ValueError:
+                allowed = ", ".join([p.value for p in Priority])
+                return {"success": False, "error": f"Invalid priority: {priority}. Allowed: {allowed}"}
+
             wo = WorkOrder(
                 wo_id="",  # Will be auto-generated
                 asset_id=asset_id,
@@ -60,13 +74,11 @@ def manage_work_order(
                 fault_code=fault_code,
                 action_code=action_code,
                 failure_class=failure_class,
-                priority=Priority(priority),
+                priority=resolved_priority,
                 assigned_to=assigned_to,
                 notes=[notes] if notes else [],
             )
-            result = asyncio.get_event_loop().run_until_complete(
-                eam.create_work_order(wo)
-            )
+            result = await eam.create_work_order(wo)
             return {
                 "success": True,
                 "action": "created",
@@ -79,14 +91,20 @@ def manage_work_order(
                 return {"success": False, "error": "wo_id required for update"}
             updates = {}
             if status:
-                updates["status"] = status
+                try:
+                    updates["status"] = _parse_work_order_status(status).value
+                except ValueError:
+                    allowed = ", ".join([s.value for s in WorkOrderStatus])
+                    return {"success": False, "error": f"Invalid status: {status}. Allowed: {allowed}"}
             if notes:
-                updates["notes"] = firestore.ArrayUnion([notes])
+                updates["notes"] = [notes]
             if priority:
-                updates["priority"] = priority
-            result = asyncio.get_event_loop().run_until_complete(
-                eam.update_work_order(wo_id, updates)
-            )
+                try:
+                    updates["priority"] = _parse_priority(priority).value
+                except ValueError:
+                    allowed = ", ".join([p.value for p in Priority])
+                    return {"success": False, "error": f"Invalid priority: {priority}. Allowed: {allowed}"}
+            result = await eam.update_work_order(wo_id, updates)
             if result:
                 return {
                     "success": True,
@@ -98,19 +116,19 @@ def manage_work_order(
         elif action == "get":
             if not wo_id:
                 return {"success": False, "error": "wo_id required for get"}
-            result = asyncio.get_event_loop().run_until_complete(
-                eam.get_work_orders(asset_id=asset_id)
-            )
+            result = await eam.get_work_orders(asset_id=asset_id)
             for wo in result:
                 if wo.wo_id == wo_id:
                     return {"success": True, "work_order": wo.model_dump()}
             return {"success": False, "error": f"Work order {wo_id} not found"}
 
         elif action == "list":
-            wo_status = WorkOrderStatus(status) if status else None
-            result = asyncio.get_event_loop().run_until_complete(
-                eam.get_work_orders(asset_id=asset_id, status=wo_status)
-            )
+            try:
+                wo_status = _parse_work_order_status(status) if status else None
+            except ValueError:
+                allowed = ", ".join([s.value for s in WorkOrderStatus])
+                return {"success": False, "error": f"Invalid status: {status}. Allowed: {allowed}"}
+            result = await eam.get_work_orders(asset_id=asset_id, status=wo_status)
             return {
                 "success": True,
                 "count": len(result),

@@ -3,7 +3,6 @@ Knowledge Base Search Tool
 ADK tool function for searching maintenance procedures and documentation.
 """
 
-import asyncio
 import logging
 
 from services.firestore_eam import get_eam_service
@@ -11,7 +10,7 @@ from services.firestore_eam import get_eam_service
 logger = logging.getLogger("maintenance-eye.tools.knowledge")
 
 
-def search_knowledge_base(
+async def search_knowledge_base(
     query: str,
     asset_type: str = "",
     department: str = "",
@@ -31,10 +30,8 @@ def search_knowledge_base(
     eam = get_eam_service()
 
     try:
-        results = asyncio.get_event_loop().run_until_complete(
-            eam.search_knowledge_base(
-                query=query, asset_type=asset_type, department=department
-            )
+        results = await eam.search_knowledge_base(
+            query=query, asset_type=asset_type, department=department
         )
         return {
             "found": len(results) > 0,

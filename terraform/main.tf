@@ -34,12 +34,19 @@ variable "gemini_api_key" {
   sensitive   = true
 }
 
+variable "allowed_origins" {
+  description = "Comma-separated list of allowed CORS origins"
+  type        = string
+  default     = ""
+}
+
 # --- Enable APIs ---
 resource "google_project_service" "apis" {
   for_each = toset([
     "run.googleapis.com",
     "firestore.googleapis.com",
     "storage.googleapis.com",
+    "secretmanager.googleapis.com",
     "cloudbuild.googleapis.com",
     "artifactregistry.googleapis.com",
   ])
@@ -79,6 +86,22 @@ resource "google_firestore_database" "default" {
   depends_on = [google_project_service.apis]
 }
 
+# --- Secret Manager ---
+resource "google_secret_manager_secret" "gemini_api_key" {
+  secret_id = "gemini-api-key"
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.apis]
+}
+
+resource "google_secret_manager_secret_version" "gemini_api_key_version" {
+  secret      = google_secret_manager_secret.gemini_api_key.id
+  secret_data = var.gemini_api_key
+}
+
 # --- Cloud Run Service ---
 resource "google_cloud_run_v2_service" "app" {
   name     = "maintenance-eye"
@@ -101,8 +124,22 @@ resource "google_cloud_run_v2_service" "app" {
         value = var.region
       }
       env {
-        name  = "GEMINI_API_KEY"
-        value = var.gemini_api_key
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+      env {
+        name = "GOOGLE_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_api_key.secret_id
+            version = "latest"
+          }
+        }
       }
       env {
         name  = "GCS_BUCKET"
@@ -111,6 +148,18 @@ resource "google_cloud_run_v2_service" "app" {
       env {
         name  = "APP_ENV"
         value = "production"
+      }
+      env {
+        name  = "ENABLE_AUTH"
+        value = "true"
+      }
+      env {
+        name  = "FIREBASE_PROJECT_ID"
+        value = var.project_id
+      }
+      env {
+        name  = "ALLOWED_ORIGINS"
+        value = var.allowed_origins
       }
 
       resources {
@@ -137,4 +186,10 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   name     = google_cloud_run_v2_service.app.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# --- Outputs ---
+output "service_url" {
+  description = "URL of the deployed Cloud Run service"
+  value       = google_cloud_run_v2_service.app.uri
 }

@@ -21,6 +21,7 @@ const state = {
     scriptProcessor: null,
     playbackCtx: null,
     playbackQueue: [],
+    currentPlaybackSource: null,
     isPlayingAudio: false,
     isMicActive: true,
     isConnected: false,
@@ -38,6 +39,7 @@ const CAPTURE_BUFFER_SIZE = 4096;
 const VIDEO_FPS = 2;
 const VIDEO_QUALITY = 0.65;
 const VIDEO_MAX_WIDTH = 640;
+const MAX_MESSAGE_ITEMS = 120;
 
 // ==================== DOM ELEMENTS ====================
 
@@ -55,7 +57,20 @@ const el = {
     findingsContainer: () => document.getElementById('findings-container'),
     confirmationContainer: () => document.getElementById('confirmation-container'),
     recordingIndicator: () => document.getElementById('recording-indicator'),
+    hudOverlay: () => document.getElementById('hud-overlay'),
 };
+
+// ==================== HUD CONTROL ====================
+
+function setHudActive(active) {
+    const hud = el.hudOverlay();
+    if (!hud) return;
+    if (active) {
+        hud.classList.add('active');
+    } else {
+        hud.classList.remove('active');
+    }
+}
 
 // ==================== CAMERA ====================
 
@@ -153,13 +168,23 @@ function float32ToInt16(float32Array) {
 
 // ==================== AUDIO PLAYBACK (PCM 24kHz → Speaker) ====================
 
-function initPlayback() {
-    state.playbackCtx = new (window.AudioContext || window.webkitAudioContext)({
-        sampleRate: RECEIVE_SAMPLE_RATE,
-    });
+async function initPlayback() {
+    if (!state.playbackCtx) {
+        state.playbackCtx = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: RECEIVE_SAMPLE_RATE,
+        });
+    }
+    if (state.playbackCtx.state === 'suspended') {
+        try {
+            await state.playbackCtx.resume();
+        } catch (err) {
+            console.warn('[Audio] Playback resume failed:', err);
+        }
+    }
 }
 
 function queueAudioPlayback(base64Pcm) {
+    if (!state.playbackCtx) return;
     const raw = base64ToArrayBuffer(base64Pcm);
     const int16 = new Int16Array(raw);
     const float32 = new Float32Array(int16.length);
@@ -173,6 +198,10 @@ function queueAudioPlayback(base64Pcm) {
 }
 
 function playNextChunk() {
+    if (!state.playbackCtx) {
+        state.isPlayingAudio = false;
+        return;
+    }
     if (state.playbackQueue.length === 0) {
         state.isPlayingAudio = false;
         return;
@@ -186,13 +215,36 @@ function playNextChunk() {
     const source = state.playbackCtx.createBufferSource();
     source.buffer = buffer;
     source.connect(state.playbackCtx.destination);
-    source.onended = playNextChunk;
+    state.currentPlaybackSource = source;
+    source.onended = () => {
+        if (state.currentPlaybackSource === source) {
+            state.currentPlaybackSource = null;
+        }
+        playNextChunk();
+    };
     source.start();
 }
 
 function clearPlaybackQueue() {
+    if (state.currentPlaybackSource) {
+        try {
+            state.currentPlaybackSource.onended = null;
+            state.currentPlaybackSource.stop();
+        } catch (err) {
+            console.debug('[Audio] Active playback source stop skipped:', err);
+        }
+        state.currentPlaybackSource = null;
+    }
     state.playbackQueue = [];
     state.isPlayingAudio = false;
+}
+
+async function stopPlayback() {
+    clearPlaybackQueue();
+    if (state.playbackCtx) {
+        await state.playbackCtx.close();
+        state.playbackCtx = null;
+    }
 }
 
 // ==================== VIDEO STREAMING (Camera → JPEG → WS) ====================
@@ -235,7 +287,9 @@ function stopVideoStreaming() {
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/inspect/${state.userId}`;
+    const token = getAuthToken();
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    const wsUrl = `${protocol}//${window.location.host}/ws/inspect/${state.userId}${tokenParam}`;
 
     console.log('[WS] Connecting:', wsUrl);
     state.ws = new WebSocket(wsUrl);
@@ -247,7 +301,6 @@ function connectWebSocket() {
 
         // Start streaming
         startAudioCapture();
-        initPlayback();
         startVideoStreaming();
     };
 
@@ -332,10 +385,16 @@ function handleServerMessage(msg) {
 
         case 'tool_call':
             setAgentStatus('Using tool...');
+            setHudActive(true);
             break;
 
         case 'tool_result':
             setAgentStatus('Processing...');
+            setHudActive(false);
+            break;
+
+        case 'media_card':
+            renderMediaCard(msg.data);
             break;
 
         case 'session_summary':
@@ -364,30 +423,69 @@ function renderConfirmationCard(actionData) {
     const priority = prompt.priority || '';
     const confidence = prompt.confidence || '';
     const codes = prompt.codes || '';
+    const priorityClass = /^P[1-5]$/.test(priority) ? priority : '';
 
     const card = document.createElement('div');
     card.className = 'confirmation-card';
     card.id = `confirm-${actionId}`;
-    card.innerHTML = `
-        <div class="confirm-header">
-            <span class="confirm-badge">${formatActionType(actionType)}</span>
-            ${priority ? `<span class="confirm-priority ${priority}">${priority}</span>` : ''}
-            ${confidence ? `<span class="confirm-confidence">${confidence}</span>` : ''}
-        </div>
-        <p class="confirm-description">${description}</p>
-        ${codes ? `<p class="confirm-codes">${codes}</p>` : ''}
-        <div class="confirm-actions">
-            <button class="confirm-btn confirm-yes" onclick="confirmAction('${actionId}')">
-                ✅ Confirm
-            </button>
-            <button class="confirm-btn confirm-no" onclick="rejectAction('${actionId}')">
-                ❌ Reject
-            </button>
-            <button class="confirm-btn confirm-edit" onclick="correctAction('${actionId}')">
-                ✏️ Correct
-            </button>
-        </div>
-    `;
+
+    const header = document.createElement('div');
+    header.className = 'confirm-header';
+
+    const badge = document.createElement('span');
+    badge.className = 'confirm-badge';
+    badge.textContent = formatActionType(actionType);
+    header.appendChild(badge);
+
+    if (priority) {
+        const priorityEl = document.createElement('span');
+        priorityEl.className = `confirm-priority${priorityClass ? ` ${priorityClass}` : ''}`;
+        priorityEl.textContent = priority;
+        header.appendChild(priorityEl);
+    }
+
+    if (confidence) {
+        const confidenceEl = document.createElement('span');
+        confidenceEl.className = 'confirm-confidence';
+        confidenceEl.textContent = confidence;
+        header.appendChild(confidenceEl);
+    }
+
+    const descEl = document.createElement('p');
+    descEl.className = 'confirm-description';
+    descEl.textContent = description;
+
+    const actions = document.createElement('div');
+    actions.className = 'confirm-actions';
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'confirm-btn confirm-yes';
+    confirmBtn.textContent = '✅ Confirm';
+    confirmBtn.addEventListener('click', () => confirmAction(actionId));
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'confirm-btn confirm-no';
+    rejectBtn.textContent = '❌ Reject';
+    rejectBtn.addEventListener('click', () => rejectAction(actionId));
+
+    const correctBtn = document.createElement('button');
+    correctBtn.className = 'confirm-btn confirm-edit';
+    correctBtn.textContent = '✏️ Correct';
+    correctBtn.addEventListener('click', () => correctAction(actionId));
+
+    actions.appendChild(confirmBtn);
+    actions.appendChild(rejectBtn);
+    actions.appendChild(correctBtn);
+
+    card.appendChild(header);
+    card.appendChild(descEl);
+    if (codes) {
+        const codesEl = document.createElement('p');
+        codesEl.className = 'confirm-codes';
+        codesEl.textContent = codes;
+        card.appendChild(codesEl);
+    }
+    card.appendChild(actions);
 
     container.prepend(card);
     // Auto-expand panel
@@ -455,8 +553,26 @@ function formatActionType(type) {
 // ==================== UI ACTIONS ====================
 
 async function startInspection() {
+    // Show feedback on splash screen while initializing
+    const splashStatus = document.getElementById('splash-status');
+    if (splashStatus) {
+        splashStatus.textContent = 'Initializing camera and microphone...';
+        splashStatus.style.display = 'block';
+    }
+
+    await initPlayback();
+
     const ready = await initCamera();
-    if (!ready) return;
+    if (!ready) {
+        // Show error on splash screen (user can still see it)
+        if (splashStatus) {
+            splashStatus.textContent = 'Camera/mic access failed. Please allow permissions and try again.';
+            splashStatus.className = 'splash-status error';
+        }
+        return;
+    }
+
+    if (splashStatus) splashStatus.style.display = 'none';
 
     el.splashScreen().classList.remove('active');
     el.inspectionScreen().classList.add('active');
@@ -467,12 +583,40 @@ async function startInspection() {
     connectWebSocket();
 }
 
-function endInspection() {
+function trimMessageHistory() {
+    const container = el.agentMessages();
+    if (!container) return;
+    while (container.childElementCount > MAX_MESSAGE_ITEMS) {
+        container.removeChild(container.firstElementChild);
+    }
+}
+
+function waitMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function sendEndSessionAndFlush(timeoutMs = 500) {
+    if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
     wsSend('end_session', {});
+
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
+        if (state.ws.bufferedAmount === 0) {
+            await waitMs(100);
+            return;
+        }
+        await waitMs(50);
+    }
+}
+
+async function endInspection() {
+    await sendEndSessionAndFlush();
 
     stopVideoStreaming();
     stopAudioCapture();
     clearPlaybackQueue();
+    void stopPlayback();
     stopCamera();
     clearInterval(state.timerInterval);
 
@@ -546,14 +690,57 @@ function requestReport() {
     addUserMessage('📄 Requesting inspection report...');
 }
 
+// ==================== MEDIA CARDS ====================
+
+function renderMediaCard(data) {
+    const container = el.agentMessages();
+    if (!container) return;
+
+    const card = document.createElement('div');
+    card.className = 'media-card fade-in';
+
+    if (data.image_url) {
+        const img = document.createElement('img');
+        img.className = 'media-card-img';
+        img.src = data.image_url;
+        img.alt = data.title || 'Media';
+        card.appendChild(img);
+    }
+
+    const content = document.createElement('div');
+    content.className = 'media-card-content';
+
+    if (data.title) {
+        const title = document.createElement('h4');
+        title.className = 'media-card-title';
+        title.textContent = data.title;
+        content.appendChild(title);
+    }
+
+    if (data.description) {
+        const desc = document.createElement('p');
+        desc.className = 'media-card-desc';
+        desc.textContent = data.description;
+        content.appendChild(desc);
+    }
+
+    card.appendChild(content);
+    container.appendChild(card);
+    trimMessageHistory();
+    container.scrollTop = container.scrollHeight;
+}
+
 // ==================== UI HELPERS ====================
 
 function addAgentMessage(text) {
     const container = el.agentMessages();
     const div = document.createElement('div');
     div.className = 'message agent-message fade-in';
-    div.innerHTML = `<p>${text}</p>`;
+    const p = document.createElement('p');
+    p.textContent = text;
+    div.appendChild(p);
     container.appendChild(div);
+    trimMessageHistory();
     container.scrollTop = container.scrollHeight;
 }
 
@@ -561,8 +748,11 @@ function addUserMessage(text) {
     const container = el.agentMessages();
     const div = document.createElement('div');
     div.className = 'message user-message fade-in';
-    div.innerHTML = `<p>${text}</p>`;
+    const p = document.createElement('p');
+    p.textContent = text;
+    div.appendChild(p);
     container.appendChild(div);
+    trimMessageHistory();
     container.scrollTop = container.scrollHeight;
 }
 
@@ -572,8 +762,13 @@ function addTranscript(speaker, text) {
     const cls = speaker === 'You' ? 'transcript-user' : 'transcript-agent';
     const div = document.createElement('div');
     div.className = `message transcript ${cls} fade-in`;
-    div.innerHTML = `<span class="transcript-speaker">${speaker}:</span> ${text}`;
+    const speakerEl = document.createElement('span');
+    speakerEl.className = 'transcript-speaker';
+    speakerEl.textContent = `${speaker}:`;
+    div.appendChild(speakerEl);
+    div.appendChild(document.createTextNode(` ${text}`));
     container.appendChild(div);
+    trimMessageHistory();
     container.scrollTop = container.scrollHeight;
 }
 
@@ -581,14 +776,28 @@ function addFinding(finding) {
     const container = el.findingsContainer();
     const severity = finding.severity || 'P3';
     const confidence = finding.confidence ? `${Math.round(finding.confidence * 100)}%` : '';
+    const severityClass = /^P[1-5]$/.test(severity) ? severity : 'P3';
 
     const div = document.createElement('div');
-    div.className = `finding-card severity-${severity} fade-in`;
-    div.innerHTML = `
-        <span class="finding-severity ${severity}">${severity}</span>
-        <span class="finding-text">${finding.description}</span>
-        ${confidence ? `<span class="finding-confidence">${confidence}</span>` : ''}
-    `;
+    div.className = `finding-card severity-${severityClass} fade-in`;
+
+    const severityEl = document.createElement('span');
+    severityEl.className = `finding-severity ${severityClass}`;
+    severityEl.textContent = severity;
+
+    const textEl = document.createElement('span');
+    textEl.className = 'finding-text';
+    textEl.textContent = finding.description || '';
+
+    div.appendChild(severityEl);
+    div.appendChild(textEl);
+
+    if (confidence) {
+        const confidenceEl = document.createElement('span');
+        confidenceEl.className = 'finding-confidence';
+        confidenceEl.textContent = confidence;
+        div.appendChild(confidenceEl);
+    }
     container.appendChild(div);
 }
 
@@ -646,174 +855,448 @@ function base64ToArrayBuffer(base64) {
 
 // ==================== DASHBOARD ====================
 
-let currentTab = 'assets';
-let searchTimeout = null;
+let currentPage = 'work-orders';
+let _pageSearchTimeouts = {};
+let _filtersLoaded = false;
 
 function showDashboard() {
     document.getElementById('splash-screen').classList.remove('active');
     document.getElementById('dashboard-screen').classList.add('active');
-    loadTabData('assets');
+    if (!_filtersLoaded) {
+        loadFilterOptions();
+        _filtersLoaded = true;
+    }
+    navigateTo('work-orders');
 }
 
 window.hideDashboard = function hideDashboard() {
-    console.log('hideDashboard called');
     document.getElementById('dashboard-screen').classList.remove('active');
     document.getElementById('splash-screen').classList.add('active');
 }
 
-// Bind back button via addEventListener (fallback for inline onclick)
 document.addEventListener('DOMContentLoaded', () => {
     const backBtn = document.getElementById('btn-back');
     if (backBtn) {
         backBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            hideDashboard();
+            window.hideDashboard();
         });
     }
 });
 
-function switchTab(tab) {
-    currentTab = tab;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-    document.getElementById('search-input').value = '';
-    loadTabData(tab);
+// --- Navigation ---
+
+function navigateTo(page) {
+    currentPage = page;
+
+    // Update sidebar active
+    document.querySelectorAll('.nav-item').forEach(b => {
+        b.classList.toggle('active', b.dataset.page === page);
+    });
+    // Update bottom nav active
+    document.querySelectorAll('.bnav-item').forEach(b => {
+        b.classList.toggle('active', b.dataset.page === page);
+    });
+    // Show/hide pages
+    document.querySelectorAll('.dash-page').forEach(p => {
+        p.classList.toggle('active', p.id === `page-${page}`);
+    });
+
+    // Trigger data load
+    switch (page) {
+        case 'work-orders': loadWorkOrders(); break;
+        case 'assets': loadAssets(); break;
+        case 'locations': loadLocations(); break;
+        case 'knowledge': loadKnowledge(); break;
+        case 'eam-codes': loadEAMCodes(); break;
+    }
 }
 
-function debounceSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        loadTabData(currentTab, document.getElementById('search-input').value);
+// --- Utilities ---
+
+function escapeHtml(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function formatLabel(str) {
+    if (!str) return '';
+    return String(str).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatDate(str) {
+    if (!str) return '';
+    try {
+        const d = new Date(str);
+        return d.toLocaleDateString('en-CA'); // YYYY-MM-DD
+    } catch { return str; }
+}
+
+function populateDropdown(selectId, options, labelFn) {
+    const el = document.getElementById(selectId);
+    if (!el) return;
+    const current = el.value;
+    const firstOpt = el.options[0]?.text || 'All';
+    el.innerHTML = `<option value="">${escapeHtml(firstOpt)}</option>`;
+    options.forEach(opt => {
+        const val = typeof opt === 'string' ? opt : opt.value;
+        const label = labelFn ? labelFn(opt) : (typeof opt === 'string' ? formatLabel(opt) : opt.label);
+        el.innerHTML += `<option value="${escapeHtml(val)}">${escapeHtml(label)}</option>`;
+    });
+    if (current) el.value = current;
+}
+
+function showPageState(pageId, state) {
+    const page = document.getElementById(pageId);
+    if (!page) return;
+    const loading = page.querySelector('.dash-loading');
+    const empty = page.querySelector('.dash-empty');
+    const table = page.querySelector('.data-table');
+    const grid = page.querySelector('.data-grid');
+    if (loading) loading.style.display = state === 'loading' ? 'flex' : 'none';
+    if (empty) empty.style.display = state === 'empty' ? 'flex' : 'none';
+    if (table) table.style.display = state === 'data' ? 'table' : 'none';
+    if (grid && state !== 'data') grid.innerHTML = '';
+}
+
+async function apiFetch(url) {
+    const token = getAuthToken();
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const resp = await fetch(url, { headers });
+    return resp.json();
+}
+
+// --- Filter Options Loader ---
+
+async function loadFilterOptions() {
+    const DEPARTMENTS = [
+        'Rolling Stock', 'Guideway', 'Power Systems',
+        'Signal & Telecom', 'Facilities', 'Elevating Devices'
+    ];
+    const PRIORITIES = ['P1', 'P2', 'P3', 'P4', 'P5'];
+    const STATUSES = ['open', 'in_progress', 'on_hold', 'completed', 'cancelled'];
+    const CODE_TYPES = ['problem', 'fault', 'action'];
+
+    // WO filters
+    populateDropdown('wo-filter-status', STATUSES, s => formatLabel(s));
+    populateDropdown('wo-filter-priority', PRIORITIES, p => p);
+    populateDropdown('wo-filter-department', DEPARTMENTS, d => d);
+    // Asset filters
+    populateDropdown('asset-filter-department', DEPARTMENTS, d => d);
+    // KB filter
+    populateDropdown('kb-filter-department', DEPARTMENTS, d => d);
+    // EAM filters
+    populateDropdown('eam-filter-type', CODE_TYPES, t => formatLabel(t));
+    populateDropdown('eam-filter-department', DEPARTMENTS, d => d);
+
+    // Load locations for WO filter + asset station filter
+    try {
+        const locations = await apiFetch('/api/locations');
+        if (Array.isArray(locations)) {
+            populateDropdown('wo-filter-location', locations.map(l => ({ value: l.station, label: l.station })));
+            populateDropdown('asset-filter-station', locations.map(l => ({ value: l.station, label: l.station })));
+        }
+    } catch (e) {
+        console.warn('Failed to load locations for filters:', e);
+    }
+
+    // Load asset types
+    try {
+        const assets = await apiFetch('/api/assets');
+        if (Array.isArray(assets)) {
+            const types = [...new Set(assets.map(a => a.type).filter(Boolean))].sort();
+            populateDropdown('asset-filter-type', types, t => t);
+        }
+    } catch (e) {
+        console.warn('Failed to load asset types:', e);
+    }
+}
+
+// --- Debounced Page Search ---
+
+function debouncePageSearch(page) {
+    clearTimeout(_pageSearchTimeouts[page]);
+    _pageSearchTimeouts[page] = setTimeout(() => {
+        switch (page) {
+            case 'work-orders': loadWorkOrders(); break;
+            case 'assets': loadAssets(); break;
+            case 'knowledge': loadKnowledge(); break;
+            case 'eam-codes': loadEAMCodes(); break;
+        }
     }, 300);
 }
 
-async function loadTabData(tab, query = '') {
-    const grid = document.getElementById('data-grid');
-    const loading = document.getElementById('data-loading');
-    const empty = document.getElementById('data-empty');
+// --- Work Orders ---
 
-    grid.innerHTML = '';
-    loading.style.display = 'flex';
-    empty.style.display = 'none';
+async function loadWorkOrders() {
+    const pageId = 'page-work-orders';
+    showPageState(pageId, 'loading');
 
     try {
-        let url = '';
-        switch (tab) {
-            case 'assets':
-                url = `/api/assets?q=${encodeURIComponent(query)}`;
-                break;
-            case 'work-orders':
-                url = `/api/work-orders?asset_id=${encodeURIComponent(query)}`;
-                break;
-            case 'knowledge':
-                url = `/api/knowledge?q=${encodeURIComponent(query || 'maintenance')}`;
-                break;
-            case 'eam-codes':
-                url = `/api/eam-codes?code_type=${encodeURIComponent(query)}`;
-                break;
-        }
+        const q = (document.getElementById('wo-search')?.value || '').trim();
+        const status = document.getElementById('wo-filter-status')?.value || '';
+        const priority = document.getElementById('wo-filter-priority')?.value || '';
+        const department = document.getElementById('wo-filter-department')?.value || '';
+        const location = document.getElementById('wo-filter-location')?.value || '';
 
-        const resp = await fetch(url);
-        const data = await resp.json();
-        loading.style.display = 'none';
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        if (status) params.set('status', status);
+        if (priority) params.set('priority', priority);
+        if (department) params.set('department', department);
+        if (location) params.set('location', location);
 
+        const data = await apiFetch(`/api/work-orders?${params}`);
         const items = Array.isArray(data) ? data : [];
-        if (items.length === 0) {
-            empty.style.display = 'flex';
-            return;
-        }
+        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
 
-        items.forEach(item => {
-            grid.appendChild(createDataCard(tab, item));
-        });
+        renderWorkOrderTable(items);
+        showPageState(pageId, 'data');
     } catch (err) {
-        loading.style.display = 'none';
-        grid.innerHTML = `<div class="data-error">Error loading data: ${err.message}</div>`;
+        showPageState(pageId, 'empty');
+        console.error('Error loading work orders:', err);
     }
 }
 
-function createDataCard(tab, item) {
-    const card = document.createElement('div');
-    card.className = 'data-card fade-in';
+function renderWorkOrderTable(orders) {
+    const tbody = document.getElementById('wo-tbody');
+    tbody.innerHTML = '';
+    orders.forEach(wo => {
+        const pr = String(wo.priority || 'P3').toUpperCase();
+        const st = String(wo.status || 'open').toLowerCase();
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="cell-mono">${escapeHtml(wo.wo_id || '')}</td>
+            <td><span class="badge priority-${escapeHtml(pr)}">${escapeHtml(pr)}</span></td>
+            <td class="cell-truncate">${escapeHtml(wo.description || '')}</td>
+            <td class="cell-mono">${escapeHtml(wo.asset_id || '')}</td>
+            <td><span class="badge status-${escapeHtml(st)}">${escapeHtml(formatLabel(st))}</span></td>
+            <td class="cell-mono">${escapeHtml(wo.problem_code || '')}</td>
+            <td>${escapeHtml(formatDate(wo.created_date || wo.created_at || ''))}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
 
-    switch (tab) {
-        case 'assets':
-            card.innerHTML = `
-                <div class="card-header">
-                    <span class="card-badge">${item.type || item.asset_type || 'Asset'}</span>
-                    <span class="card-id">${item.asset_id || ''}</span>
-                </div>
-                <h3 class="card-title">${item.name || item.asset_id || 'Unknown'}</h3>
-                <div class="card-meta">
-                    ${item.department ? `<span>📍 ${item.department}</span>` : ''}
-                    ${item.location && item.location.station ? `<span>📌 ${item.location.station}</span>` : ''}
-                </div>
-                ${item.manufacturer ? `<div class="card-detail">Manufacturer: ${item.manufacturer}</div>` : ''}
-                ${item.status ? `<div class="card-status status-${item.status}">${item.status.toUpperCase()}</div>` : ''}
-            `;
-            break;
+// --- Assets ---
 
-        case 'work-orders':
-            const priorityClass = item.priority || 'P3';
-            card.innerHTML = `
-                <div class="card-header">
-                    <span class="card-badge priority-${priorityClass}">${priorityClass}</span>
-                    <span class="card-id">${item.wo_id || ''}</span>
-                </div>
-                <h3 class="card-title">${item.description || 'Work Order'}</h3>
-                <div class="card-meta">
-                    ${item.asset_id ? `<span>🔧 ${item.asset_id}</span>` : ''}
-                    ${item.status ? `<span>📋 ${item.status}</span>` : ''}
-                </div>
-                ${item.problem_code ? `<div class="card-detail">Problem: ${item.problem_code}</div>` : ''}
-                ${item.created_date ? `<div class="card-detail">Created: ${item.created_date}</div>` : ''}
-            `;
-            break;
+async function loadAssets() {
+    const pageId = 'page-assets';
+    showPageState(pageId, 'loading');
 
-        case 'knowledge':
-            card.innerHTML = `
-                <div class="card-header">
-                    <span class="card-badge">📖 Knowledge</span>
-                </div>
-                <h3 class="card-title">${item.title || item.topic || 'Article'}</h3>
-                <div class="card-meta">
-                    ${item.asset_type ? `<span>🔧 ${item.asset_type}</span>` : ''}
-                    ${item.department ? `<span>📍 ${item.department}</span>` : ''}
-                </div>
-                ${item.content ? `<div class="card-detail card-content">${item.content.substring(0, 200)}${item.content.length > 200 ? '...' : ''}</div>` : ''}
-            `;
-            break;
+    try {
+        const q = (document.getElementById('asset-search')?.value || '').trim();
+        const department = document.getElementById('asset-filter-department')?.value || '';
+        const assetType = document.getElementById('asset-filter-type')?.value || '';
+        const station = document.getElementById('asset-filter-station')?.value || '';
 
-        case 'eam-codes':
-            card.innerHTML = `
-                <div class="card-header">
-                    <span class="card-badge">${item.code_type || 'Code'}</span>
-                    <span class="card-id">${item.code || ''}</span>
-                </div>
-                <h3 class="card-title">${item.description || item.code || 'EAM Code'}</h3>
-                <div class="card-meta">
-                    ${item.department ? `<span>📍 ${item.department}</span>` : ''}
-                    ${item.asset_type ? `<span>🔧 ${item.asset_type}</span>` : ''}
-                </div>
-            `;
-            break;
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        if (department) params.set('department', department);
+        if (assetType) params.set('asset_type', assetType);
+        if (station) params.set('station', station);
+
+        const data = await apiFetch(`/api/assets?${params}`);
+        const items = Array.isArray(data) ? data : [];
+        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
+
+        renderAssetsGrid(items);
+        showPageState(pageId, 'data');
+    } catch (err) {
+        showPageState(pageId, 'empty');
+        console.error('Error loading assets:', err);
     }
+}
 
-    return card;
+function renderAssetsGrid(assets) {
+    const grid = document.getElementById('asset-grid');
+    grid.innerHTML = '';
+    assets.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'data-card fade-in';
+        const statusClass = String(item.status || '').toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        card.innerHTML = `
+            <div class="card-header">
+                <span class="card-badge">${escapeHtml(item.type || 'Asset')}</span>
+                <span class="card-id">${escapeHtml(item.asset_id || '')}</span>
+            </div>
+            <h3 class="card-title">${escapeHtml(item.name || item.asset_id || 'Unknown')}</h3>
+            <div class="card-meta">
+                ${item.department ? `<span>${escapeHtml(item.department)}</span>` : ''}
+                ${item.location?.station ? `<span>${escapeHtml(item.location.station)}</span>` : ''}
+            </div>
+            ${item.manufacturer ? `<div class="card-detail">Mfg: ${escapeHtml(item.manufacturer)}</div>` : ''}
+            ${item.status ? `<div class="card-status status-${statusClass}">${escapeHtml(String(item.status).toUpperCase())}</div>` : ''}
+        `;
+        grid.appendChild(card);
+    });
+}
+
+// --- Locations ---
+
+async function loadLocations() {
+    const pageId = 'page-locations';
+    showPageState(pageId, 'loading');
+
+    try {
+        const data = await apiFetch('/api/locations');
+        const items = Array.isArray(data) ? data : [];
+        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
+
+        renderLocationsPage(items);
+        showPageState(pageId, 'data');
+    } catch (err) {
+        showPageState(pageId, 'empty');
+        console.error('Error loading locations:', err);
+    }
+}
+
+function renderLocationsPage(locations) {
+    const container = document.getElementById('locations-list');
+    container.innerHTML = '';
+
+    // Group by zone
+    const zones = {};
+    locations.forEach(loc => {
+        const zone = loc.zone || 'Other';
+        if (!zones[zone]) zones[zone] = [];
+        zones[zone].push(loc);
+    });
+
+    Object.keys(zones).sort().forEach(zone => {
+        const group = document.createElement('div');
+        group.className = 'zone-group';
+        group.innerHTML = `<div class="zone-label">${escapeHtml(zone)}</div>`;
+        zones[zone].forEach(loc => {
+            const row = document.createElement('div');
+            row.className = 'location-row';
+            row.innerHTML = `
+                <div>
+                    <span class="location-name">${escapeHtml(loc.station)}</span>
+                    <span class="location-code">${escapeHtml(loc.station_code || '')}</span>
+                </div>
+                <span class="location-count">${loc.asset_count} asset${loc.asset_count !== 1 ? 's' : ''}</span>
+            `;
+            group.appendChild(row);
+        });
+        container.appendChild(group);
+    });
+}
+
+// --- Knowledge Base ---
+
+async function loadKnowledge() {
+    const pageId = 'page-knowledge';
+    showPageState(pageId, 'loading');
+
+    try {
+        const q = (document.getElementById('kb-search')?.value || '').trim();
+        const department = document.getElementById('kb-filter-department')?.value || '';
+
+        const params = new URLSearchParams();
+        params.set('q', q || 'maintenance');
+        if (department) params.set('department', department);
+
+        const data = await apiFetch(`/api/knowledge?${params}`);
+        const items = Array.isArray(data) ? data : [];
+        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
+
+        renderKnowledgeGrid(items);
+        showPageState(pageId, 'data');
+    } catch (err) {
+        showPageState(pageId, 'empty');
+        console.error('Error loading knowledge:', err);
+    }
+}
+
+function renderKnowledgeGrid(entries) {
+    const grid = document.getElementById('kb-grid');
+    grid.innerHTML = '';
+    entries.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'data-card fade-in';
+        const preview = String(item.content || '').substring(0, 200);
+        card.innerHTML = `
+            <div class="card-header">
+                <span class="card-badge">Knowledge</span>
+            </div>
+            <h3 class="card-title">${escapeHtml(item.title || 'Article')}</h3>
+            <div class="card-meta">
+                ${item.department ? `<span>${escapeHtml(item.department)}</span>` : ''}
+                ${(item.tags || []).slice(0, 3).map(t => `<span>${escapeHtml(t)}</span>`).join('')}
+            </div>
+            ${preview ? `<div class="card-detail card-content">${escapeHtml(preview)}${item.content?.length > 200 ? '...' : ''}</div>` : ''}
+        `;
+        grid.appendChild(card);
+    });
+}
+
+// --- EAM Codes ---
+
+async function loadEAMCodes() {
+    const pageId = 'page-eam-codes';
+    showPageState(pageId, 'loading');
+
+    try {
+        const q = (document.getElementById('eam-search')?.value || '').trim();
+        const codeType = document.getElementById('eam-filter-type')?.value || '';
+        const department = document.getElementById('eam-filter-department')?.value || '';
+
+        const params = new URLSearchParams();
+        if (codeType) params.set('code_type', codeType);
+        if (department) params.set('department', department);
+
+        const data = await apiFetch(`/api/eam-codes?${params}`);
+        let items = Array.isArray(data) ? data : [];
+
+        // Client-side text filter
+        if (q) {
+            const ql = q.toLowerCase();
+            items = items.filter(c =>
+                (c.code || '').toLowerCase().includes(ql) ||
+                (c.description || '').toLowerCase().includes(ql) ||
+                (c.code_type || '').toLowerCase().includes(ql)
+            );
+        }
+
+        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
+
+        renderEAMCodesTable(items);
+        showPageState(pageId, 'data');
+    } catch (err) {
+        showPageState(pageId, 'empty');
+        console.error('Error loading EAM codes:', err);
+    }
+}
+
+function renderEAMCodesTable(codes) {
+    const tbody = document.getElementById('eam-tbody');
+    tbody.innerHTML = '';
+    codes.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="cell-mono">${escapeHtml(c.code || '')}</td>
+            <td>${escapeHtml(formatLabel(c.code_type || ''))}</td>
+            <td class="cell-truncate">${escapeHtml(c.description || '')}</td>
+            <td>${escapeHtml(c.department || '')}</td>
+            <td>${escapeHtml((c.asset_types || []).join(', '))}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function getAuthToken() {
+    return window.localStorage.getItem('firebase_id_token') || '';
 }
 
 // ==================== SERVICE WORKER ====================
 
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(function (registrations) {
-        for (let registration of registrations) {
-            registration.unregister();
-            console.log('[SW] Unregistered to clear aggressive cache');
-        }
-    });
-    // Clear all caches manually
-    caches.keys().then(keys => {
-        keys.forEach(key => caches.delete(key));
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+            .then(() => console.log('[SW] Registered'))
+            .catch((err) => console.error('[SW] Registration failed:', err));
     });
 }

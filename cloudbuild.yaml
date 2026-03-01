@@ -2,15 +2,14 @@
 # Builds Docker image, pushes to Artifact Registry, deploys to Cloud Run.
 #
 # Trigger: Push to main branch (or manual)
-# Usage:  gcloud builds submit --config=cloudbuild.yaml \
-#           --substitutions=_GEMINI_API_KEY="your-key"
+# Usage:  gcloud builds submit --config=cloudbuild.yaml
 
 substitutions:
   _REGION: us-central1
   _SERVICE_NAME: maintenance-eye
   _REPO_NAME: maintenance-eye
-  _GEMINI_API_KEY: ""
   _TAG: latest
+  _ALLOWED_ORIGINS: ""
 
 steps:
   # Step 1: Build Docker image
@@ -54,8 +53,13 @@ steps:
       - "0"
       - "--max-instances"
       - "3"
+      - "--timeout"
+      - "3600"
+      - "--session-affinity"
       - "--set-env-vars"
-      - "GCP_PROJECT_ID=${PROJECT_ID},GCP_REGION=${_REGION},GEMINI_API_KEY=${_GEMINI_API_KEY},GOOGLE_API_KEY=${_GEMINI_API_KEY},APP_ENV=production"
+      - "^:::^GCP_PROJECT_ID=${PROJECT_ID}:::GCP_REGION=${_REGION}:::APP_ENV=production:::ENABLE_AUTH=true:::FIREBASE_PROJECT_ID=${PROJECT_ID}:::ALLOWED_ORIGINS=${_ALLOWED_ORIGINS}:::GCS_BUCKET=${PROJECT_ID}-maintenance-eye-storage"
+      - "--set-secrets"
+      - "GEMINI_API_KEY=gemini-api-key:latest,GOOGLE_API_KEY=gemini-api-key:latest"
 
 images:
   - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO_NAME}/backend:${_TAG}"

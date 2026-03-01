@@ -40,6 +40,7 @@ COPY backend/ .
 
 # Copy frontend for static serving
 COPY frontend/ /app/frontend/
+COPY data/ /app/data/
 
 # Non-root user for security
 RUN useradd -m appuser && chown -R appuser:appuser /app

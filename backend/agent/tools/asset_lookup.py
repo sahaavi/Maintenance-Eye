@@ -3,16 +3,14 @@ Asset Lookup Tool
 ADK tool function for finding assets by name, code, or location.
 """
 
-import asyncio
 import logging
-from typing import Optional
 
 from services.firestore_eam import get_eam_service
 
 logger = logging.getLogger("maintenance-eye.tools.asset")
 
 
-def lookup_asset(
+async def lookup_asset(
     query: str = "",
     asset_id: str = "",
     department: str = "",
@@ -39,9 +37,7 @@ def lookup_asset(
 
     try:
         if asset_id:
-            asset = asyncio.get_event_loop().run_until_complete(
-                eam.get_asset(asset_id)
-            )
+            asset = await eam.get_asset(asset_id)
             if asset:
                 return {
                     "found": True,
@@ -50,13 +46,11 @@ def lookup_asset(
                 }
             return {"found": False, "count": 0, "assets": [], "message": f"No asset found with ID: {asset_id}"}
 
-        assets = asyncio.get_event_loop().run_until_complete(
-            eam.search_assets(
-                query=query,
-                department=department,
-                station=station,
-                asset_type=asset_type,
-            )
+        assets = await eam.search_assets(
+            query=query,
+            department=department,
+            station=station,
+            asset_type=asset_type,
         )
         return {
             "found": len(assets) > 0,

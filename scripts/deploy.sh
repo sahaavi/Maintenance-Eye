@@ -10,14 +10,15 @@
 #   4. Gemini API key from https://aistudio.google.com/apikey
 #
 # Usage:
-#   ./scripts/deploy.sh <project-id> <gemini-api-key> [region]
+#   ./scripts/deploy.sh <project-id> <gemini-api-key> [region] [allowed-origins]
 # =============================================================================
 
 set -euo pipefail
 
-PROJECT_ID="${1:?Usage: ./scripts/deploy.sh <project-id> <gemini-api-key> [region]}"
-GEMINI_API_KEY="${2:?Usage: ./scripts/deploy.sh <project-id> <gemini-api-key> [region]}"
+PROJECT_ID="${1:?Usage: ./scripts/deploy.sh <project-id> <gemini-api-key> [region] [allowed-origins]}"
+GEMINI_API_KEY="${2:?Usage: ./scripts/deploy.sh <project-id> <gemini-api-key> [region] [allowed-origins]}"
 REGION="${3:-us-central1}"
+ALLOWED_ORIGINS="${4:-}"
 SERVICE_NAME="maintenance-eye"
 
 echo "============================================"
@@ -38,6 +39,7 @@ gcloud services enable \
   run.googleapis.com \
   firestore.googleapis.com \
   storage.googleapis.com \
+  secretmanager.googleapis.com \
   cloudbuild.googleapis.com \
   artifactregistry.googleapis.com
 
@@ -50,24 +52,31 @@ gcloud artifacts repositories create maintenance-eye \
   --quiet 2>/dev/null || echo "  (already exists)"
 
 # 4. Build and push Docker image
+# 4. Create/update Secret Manager secret for Gemini API key
+echo ""
+echo ">>> Ensuring Secret Manager secret exists..."
+gcloud secrets describe gemini-api-key --project="$PROJECT_ID" >/dev/null 2>&1 || \
+  gcloud secrets create gemini-api-key --replication-policy="automatic" --project="$PROJECT_ID"
+printf "%s" "$GEMINI_API_KEY" | gcloud secrets versions add gemini-api-key --data-file=- --project="$PROJECT_ID" >/dev/null
+
+# 5. Build and push Docker image
 echo ""
 echo ">>> Building Docker image via Cloud Build..."
 gcloud builds submit \
   --config=cloudbuild.yaml \
-  --substitutions="_GEMINI_API_KEY=${GEMINI_API_KEY},_REGION=${REGION}"
+  --substitutions="_REGION=${REGION}"
 
-# 5. Terraform (optional — if user has terraform installed)
+# 6. Terraform (optional — if user has terraform installed)
 if command -v terraform &> /dev/null; then
   echo ""
   echo ">>> Running Terraform..."
   cd terraform
-  cat > terraform.tfvars <<EOF
-project_id     = "$PROJECT_ID"
-region         = "$REGION"
-gemini_api_key = "$GEMINI_API_KEY"
-EOF
   terraform init
-  terraform apply -auto-approve
+  terraform apply -auto-approve \
+    -var="project_id=${PROJECT_ID}" \
+    -var="region=${REGION}" \
+    -var="gemini_api_key=${GEMINI_API_KEY}" \
+    -var="allowed_origins=${ALLOWED_ORIGINS}"
   SERVICE_URL=$(terraform output -raw service_url)
   cd ..
 else

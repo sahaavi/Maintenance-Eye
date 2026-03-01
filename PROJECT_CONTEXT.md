@@ -67,6 +67,8 @@ The system is modeled after real SkyTrain maintenance operations:
 | `manage_work_order` | Create/update WOs with auto-classified EAM codes |
 | `get_safety_protocol` | Safety procedures, LOTO, PPE |
 | `generate_report` | Inspection summary with photos |
+| `propose_action` | Propose critical actions for technician confirmation |
+| `check_pending_actions` | Review unresolved confirmations in current session |
 
 ## Key Judging Criteria
 
@@ -91,4 +93,4 @@ The system is modeled after real SkyTrain maintenance operations:
 
 ## Status
 
-**Phase**: Planning — implementation plan under review before execution begins.
+**Phase**: Active development — core MVP implemented, hardening and submission packaging in progress.

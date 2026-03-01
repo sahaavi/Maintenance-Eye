@@ -3,15 +3,21 @@ Inspection History Tool
 ADK tool function for retrieving past inspection records.
 """
 
-import asyncio
 import logging
 
+from models.schemas import WorkOrderStatus
 from services.firestore_eam import get_eam_service
 
 logger = logging.getLogger("maintenance-eye.tools.history")
 
+OPEN_WORK_ORDER_STATUSES = {WorkOrderStatus.OPEN.value, WorkOrderStatus.IN_PROGRESS.value}
 
-def get_inspection_history(
+
+def _status_value(status: object) -> str:
+    return status.value if isinstance(status, WorkOrderStatus) else str(status)
+
+
+async def get_inspection_history(
     asset_id: str,
     limit: int = 5,
 ) -> dict:
@@ -29,12 +35,8 @@ def get_inspection_history(
     eam = get_eam_service()
 
     try:
-        inspections = asyncio.get_event_loop().run_until_complete(
-            eam.get_inspection_history(asset_id, limit=limit)
-        )
-        work_orders = asyncio.get_event_loop().run_until_complete(
-            eam.get_work_orders(asset_id=asset_id)
-        )
+        inspections = await eam.get_inspection_history(asset_id, limit=limit)
+        work_orders = await eam.get_work_orders(asset_id=asset_id)
 
         # Identify recurring issues
         fault_counts: dict[str, int] = {}
@@ -49,7 +51,9 @@ def get_inspection_history(
             if count > 1
         ]
 
-        open_wos = [wo for wo in work_orders if wo.status in ("open", "in_progress")]
+        open_wos = [
+            wo for wo in work_orders if _status_value(wo.status) in OPEN_WORK_ORDER_STATUSES
+        ]
 
         return {
             "asset_id": asset_id,

@@ -9,9 +9,16 @@
     "theme_color": "#0f172a",
     "icons": [
         {
-            "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><circle cx='24' cy='24' r='22' stroke='%2306b6d4' stroke-width='2.5' fill='none'/><circle cx='24' cy='24' r='4' fill='%2306b6d4'/></svg>",
-            "sizes": "any",
-            "type": "image/svg+xml"
+            "src": "/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
         }
     ]
 }

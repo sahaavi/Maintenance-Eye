@@ -66,6 +66,26 @@ class EAMService(ABC):
         """Get work orders, optionally filtered by asset and status."""
         ...
 
+    @abstractmethod
+    async def search_work_orders(
+        self,
+        q: str = "",
+        priority: str = "",
+        department: str = "",
+        status: Optional[WorkOrderStatus] = None,
+        location: str = "",
+    ) -> list[WorkOrder]:
+        """Search work orders with full-text query across wo_id, description,
+        asset_id, and EAM codes. Supports priority, department, status, and
+        location (resolved via asset join) filters."""
+        ...
+
+    @abstractmethod
+    async def get_locations(self) -> list[dict]:
+        """Return unique stations derived from assets.
+        Each dict has: station, station_code, zone, asset_count."""
+        ...
+
     # --- EAM Code Operations ---
     @abstractmethod
     async def get_eam_codes(

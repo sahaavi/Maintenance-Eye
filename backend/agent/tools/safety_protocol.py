@@ -3,7 +3,6 @@ Safety Protocol Tool
 ADK tool function for retrieving safety procedures for equipment types.
 """
 
-import asyncio
 import logging
 
 from services.firestore_eam import get_eam_service
@@ -51,7 +50,7 @@ DEFAULT_SAFETY = {
 }
 
 
-def get_safety_protocol(
+async def get_safety_protocol(
     asset_type: str,
     department: str = "",
 ) -> dict:
@@ -70,12 +69,10 @@ def get_safety_protocol(
 
     try:
         # Try knowledge base first
-        results = asyncio.get_event_loop().run_until_complete(
-            eam.search_knowledge_base(
-                query=f"safety protocol {asset_type}",
-                asset_type=asset_type,
-                department=department,
-            )
+        results = await eam.search_knowledge_base(
+            query=f"safety protocol {asset_type}",
+            asset_type=asset_type,
+            department=department,
         )
 
         if results:

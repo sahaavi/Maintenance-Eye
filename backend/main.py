@@ -6,7 +6,7 @@ Initializes the ADK Runner for bidi-streaming Live API sessions.
 
 import logging
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -17,6 +17,7 @@ from config import settings
 from api.routes import router as api_router
 from api.websocket import router as ws_router
 from agent.maintenance_agent import maintenance_agent
+from services.auth_service import require_auth_http
 
 # Configure logging
 logging.basicConfig(
@@ -53,20 +54,23 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS - allow frontend
+# CORS
+cors_origins = settings.cors_origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Restrict in production
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logger.info(f"CORS origins configured: {cors_origins or 'none'}")
 
 import os
 from pathlib import Path
 
 # API routes
-app.include_router(api_router, prefix="/api")
+api_dependencies = [Depends(require_auth_http)] if settings.auth_enabled else []
+app.include_router(api_router, prefix="/api", dependencies=api_dependencies)
 app.include_router(ws_router)
 
 

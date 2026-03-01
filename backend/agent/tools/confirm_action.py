@@ -9,24 +9,29 @@ The agent uses this tool to:
 """
 
 import logging
-from typing import Optional
+from contextvars import ContextVar
 
 from services.confirmation_manager import (
     get_confirmation_manager,
     ActionType,
-    ConfirmationStatus,
 )
 
 logger = logging.getLogger("maintenance-eye.tools.confirm")
 
-# Session context — set by the WebSocket handler before tool invocation
-_current_session_id: str = "default"
+# Session context scoped per async task to avoid cross-session leakage.
+_session_id_ctx: ContextVar[str] = ContextVar(
+    "maintenance_eye_session_id", default="default"
+)
 
 
 def set_session_context(session_id: str):
     """Set the active session ID for tool calls."""
-    global _current_session_id
-    _current_session_id = session_id
+    _session_id_ctx.set(session_id)
+
+
+def _get_session_context() -> str:
+    """Get session ID bound to current async context."""
+    return _session_id_ctx.get()
 
 
 def propose_action(
@@ -74,7 +79,7 @@ def propose_action(
                      f"Must be one of: {[e.value for e in ActionType]}"
         }
 
-    mgr = get_confirmation_manager(_current_session_id)
+    mgr = get_confirmation_manager(_get_session_context())
 
     proposed_data = {}
     if asset_id:
@@ -145,7 +150,7 @@ def check_pending_actions() -> dict:
     Returns:
         dict with list of pending actions and session stats.
     """
-    mgr = get_confirmation_manager(_current_session_id)
+    mgr = get_confirmation_manager(_get_session_context())
     pending = mgr.get_pending()
     stats = mgr.get_stats()
 

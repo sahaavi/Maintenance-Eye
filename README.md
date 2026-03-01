@@ -30,7 +30,9 @@ Maintenance-Eye is a **real-time AI-powered visual inspection agent** for field 
    ├── 📚 search_knowledge_base
    ├── 📝 manage_work_order
    ├── ⚠️ get_safety_protocol
-   └── 📊 generate_report
+   ├── 📊 generate_report
+   ├── ✅ propose_action
+   └── 📋 check_pending_actions
        ↕
 🧠 Gemini 2.5 Flash (Live API)
        ↕
@@ -64,7 +66,7 @@ Maintenance-Eye is a **real-time AI-powered visual inspection agent** for field 
 ```bash
 git clone https://github.com/YOUR_USERNAME/Maintenance-Eye.git
 cd Maintenance-Eye
-cp .env
+touch .env
 # Edit .env with your GCP project ID and Gemini API key
 ```
 
@@ -116,7 +118,7 @@ Maintenance-Eye/
 │   ├── agent/
 │   │   ├── maintenance_agent.py  # ADK agent definition
 │   │   ├── prompts.py        # System prompts & persona
-│   │   └── tools/            # 6 ADK tool functions
+│   │   └── tools/            # 8 ADK tool functions
 │   ├── services/
 │   │   ├── eam_interface.py  # Abstract EAM service
 │   │   └── firestore_eam.py  # Firestore implementation
