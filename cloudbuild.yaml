@@ -57,7 +57,7 @@ steps:
       - "3600"
       - "--session-affinity"
       - "--set-env-vars"
-      - "^:::^GCP_PROJECT_ID=${PROJECT_ID}:::GCP_REGION=${_REGION}:::APP_ENV=production:::ENABLE_AUTH=true:::FIREBASE_PROJECT_ID=${PROJECT_ID}:::ALLOWED_ORIGINS=${_ALLOWED_ORIGINS}:::GCS_BUCKET=${PROJECT_ID}-maintenance-eye-storage"
+      - "^:::^GCP_PROJECT_ID=${PROJECT_ID}:::GCP_REGION=${_REGION}:::APP_ENV=production:::ENABLE_AUTH=false:::LOG_LEVEL=DEBUG:::FIREBASE_PROJECT_ID=${PROJECT_ID}:::ALLOWED_ORIGINS=${_ALLOWED_ORIGINS}:::GCS_BUCKET=${PROJECT_ID}-maintenance-eye-storage"
       - "--set-secrets"
       - "GEMINI_API_KEY=gemini-api-key:latest,GOOGLE_API_KEY=gemini-api-key:latest"
 

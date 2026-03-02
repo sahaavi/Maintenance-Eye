@@ -1,0 +1,19 @@
+{
+  "asset_count": 66,
+  "work_order_count": 150,
+  "asset_department_distribution": {
+    "rolling_stock": 12,
+    "guideway": 10,
+    "power": 12,
+    "signal_telecom": 12,
+    "facilities": 12,
+    "elevating_devices": 8
+  },
+  "work_order_priority_distribution": {
+    "P1": 12,
+    "P2": 23,
+    "P3": 49,
+    "P4": 40,
+    "P5": 26
+  }
+}

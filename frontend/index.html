@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=5">
 </head>
 
 <body>
@@ -61,6 +61,77 @@
                 </svg>
                 Browse Data
             </button>
+
+            <button id="btn-chat-toggle" class="btn-secondary" onclick="toggleChatPanel()">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Chat with Max
+            </button>
+
+            <!-- Chat Panel -->
+            <div id="chat-panel" class="chat-panel" style="display:none;">
+                <div class="chat-header">
+                    <div class="agent-avatar"><span>M</span></div>
+                    <div class="agent-info">
+                        <span class="agent-name">Max</span>
+                        <span class="agent-status" id="chat-agent-status">Offline</span>
+                    </div>
+                    <button class="btn-icon" onclick="closeChatPanel()" title="Close chat">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="chat-messages" class="chat-messages">
+                    <div class="message agent-message">
+                        <p>Hi! I'm Max, your maintenance co-pilot. Ask me anything about assets, work orders, safety protocols, or attach a photo for analysis.</p>
+                    </div>
+                </div>
+
+                <div id="chat-image-preview" class="chat-image-preview" style="display:none;">
+                    <img id="chat-preview-img" class="chat-preview-img" alt="Attached image">
+                    <button class="chat-preview-remove" onclick="removeAttachedImage()">&times;</button>
+                </div>
+
+                <div id="chat-image-source-picker" class="chat-image-source-picker" style="display:none;">
+                    <button class="chat-source-btn" onclick="selectChatImageFromCamera()">Take Photo</button>
+                    <button class="chat-source-btn" onclick="selectChatImageFromGallery()">Choose Photo</button>
+                </div>
+
+                <div id="chat-confirmation-container" class="confirmation-container"></div>
+
+                <div class="chat-input-bar">
+                    <button id="btn-chat-attach" class="btn-icon" onclick="attachImage()" title="Attach image">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <path d="M21 15l-5-5L5 21"/>
+                        </svg>
+                    </button>
+                    <input type="text" id="chat-input" class="chat-text-input" placeholder="Ask Max anything..."
+                           onkeydown="if(event.key==='Enter')sendChatMessage()">
+                    <button id="btn-chat-voice" class="btn-icon" onclick="toggleChatVoice()" title="Voice mode">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <line x1="12" y1="19" x2="12" y2="23"/>
+                        </svg>
+                    </button>
+                    <button id="btn-chat-send" class="btn-icon chat-send-btn" onclick="sendChatMessage()" title="Send">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <input type="file" id="chat-file-input-camera" accept="image/*" capture="environment"
+                       style="display:none" onchange="handleImageSelected(event)">
+                <input type="file" id="chat-file-input-gallery" accept="image/*"
+                       style="display:none" onchange="handleImageSelected(event)">
+            </div>
 
             <div id="splash-status" class="splash-status" style="display:none;"></div>
 
@@ -334,7 +405,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 
 </html>

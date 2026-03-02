@@ -10,7 +10,22 @@ Maintenance-Eye is an AI co-pilot for physical infrastructure maintenance, built
 
 ## Working with This Project
 
-This project follows the workflow principles defined in `RULES.md`. 
+This project follows the workflow principles defined in `RULES.md`.
+
+## Mandatory RULES Workflow
+
+Follow this sequence on every feature, fix, and refactor:
+
+1. Read `RULES.md` before implementation if you have not read it in the current session.
+2. Create or update a scoped plan in `tasks/todo.md` before writing code.
+3. Update `tasks/todo.md` continuously while working (mark done items, add WIP notes, and record milestone summaries).
+4. After each correction, failed assumption, or bug fix, append a lesson entry to `tasks/lessons.md` with context, root cause, solution, and a durable rule.
+5. Run verification steps required by `RULES.md` before marking work complete, then log the review outcome in `tasks/todo.md`.
+6. If architecture, workflow, or operating assumptions changed, reflect that change in this file and sibling agent guidance files.
+
+Path convention:
+- Canonical lessons log is `tasks/lessons.md` (plural).
+- Do not use `tasks/lesson.md`.
 
 ## Development Commands
 
@@ -34,7 +49,24 @@ python scripts/seed_data.py
 ./scripts/deploy.sh <project-id> <gemini-api-key> [region]
 ```
 
-No test suite or linter is currently configured.
+## Test System Commands
+
+```bash
+# One-time test environment bootstrap
+./scripts/setup_test_env.sh
+source .venv/bin/activate
+
+# Run full production test gate (env-aware)
+TEST_ENV=dev ./scripts/run_test_suite.sh
+
+# Run layered suites directly
+python -m pytest -m "unit or integration or api"
+python -m pytest -m "security or ai or data"
+python -m pytest -m "performance"
+python -m pytest -m "e2e"
+```
+
+CI pipeline: `.github/workflows/test-suite.yml` (quality, security, core pytest, and Playwright E2E jobs with artifact upload).
 
 ## Bug Reporting & Maintenance
 

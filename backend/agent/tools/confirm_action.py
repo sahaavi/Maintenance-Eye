@@ -18,6 +18,8 @@ from services.confirmation_manager import (
 
 logger = logging.getLogger("maintenance-eye.tools.confirm")
 
+from agent.tools.wrapper import tool_wrapper
+
 # Session context scoped per async task to avoid cross-session leakage.
 _session_id_ctx: ContextVar[str] = ContextVar(
     "maintenance_eye_session_id", default="default"
@@ -34,6 +36,7 @@ def _get_session_context() -> str:
     return _session_id_ctx.get()
 
 
+@tool_wrapper
 def propose_action(
     action_type: str,
     description: str,
@@ -142,6 +145,7 @@ def propose_action(
     }
 
 
+@tool_wrapper
 def check_pending_actions() -> dict:
     """
     Check the status of all pending actions in the current session.

@@ -17,6 +17,9 @@ def _status_value(status: object) -> str:
     return status.value if isinstance(status, WorkOrderStatus) else str(status)
 
 
+from agent.tools.wrapper import tool_wrapper
+
+@tool_wrapper
 async def get_inspection_history(
     asset_id: str,
     limit: int = 5,

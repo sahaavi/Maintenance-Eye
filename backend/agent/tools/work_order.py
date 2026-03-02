@@ -21,6 +21,9 @@ def _parse_work_order_status(status: str) -> WorkOrderStatus:
     return WorkOrderStatus(value)
 
 
+from agent.tools.wrapper import tool_wrapper
+
+@tool_wrapper
 async def manage_work_order(
     action: str,
     asset_id: str = "",
@@ -40,10 +43,14 @@ async def manage_work_order(
     for confirmation before creating a work order.
 
     Args:
-        action: One of "create", "update", "get", "list".
+        action: One of "create", "update", "get", "list", "search".
+            - "search": Find work orders by text query. Put the search terms in
+              the `description` parameter. Each word is matched independently
+              against wo_id, description, asset_id, and EAM codes.
+              Optionally filter by priority and status.
         asset_id: The asset ID this work order relates to.
         wo_id: Work order ID (required for "update" and "get").
-        description: Description of the issue found.
+        description: Description of the issue found. For "search", put search terms here.
         problem_code: EAM problem code (e.g., "ME-003").
         fault_code: EAM fault code (e.g., "WEAR-SUR").
         action_code: Recommended action code (e.g., "REPLACE").
@@ -133,6 +140,24 @@ async def manage_work_order(
                 "success": True,
                 "count": len(result),
                 "work_orders": [wo.model_dump() for wo in result],
+            }
+
+        elif action == "search":
+            # Search work orders by text query across description, asset_id, codes
+            try:
+                wo_status = _parse_work_order_status(status) if status else None
+            except ValueError:
+                wo_status = None
+            result = await eam.search_work_orders(
+                q=description or notes or "",
+                priority=priority,
+                department="",
+                status=wo_status,
+            )
+            return {
+                "success": True,
+                "count": len(result),
+                "work_orders": [wo.model_dump() for wo in result[:20]],
             }
 
         else:

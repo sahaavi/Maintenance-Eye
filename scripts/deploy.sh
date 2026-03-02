@@ -85,9 +85,26 @@ else
   SERVICE_URL=$(gcloud run services describe "$SERVICE_NAME" --region="$REGION" --format="value(status.url)")
 fi
 
+# Grant Cloud Run service account Firestore access
+echo ""
+echo ">>> Granting Firestore access to Cloud Run service account..."
+SA_EMAIL=$(gcloud iam service-accounts list --filter="displayName:Compute Engine default" --format="value(email)" 2>/dev/null || true)
+if [ -n "$SA_EMAIL" ]; then
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:$SA_EMAIL" \
+    --role="roles/datastore.user" \
+    --quiet 2>/dev/null || echo "  (binding already exists or failed)"
+  echo "  Firestore access granted to: $SA_EMAIL"
+else
+  echo "  ⚠️  Could not find default service account — grant roles/datastore.user manually"
+fi
+
 echo ""
 echo "============================================"
 echo "  ✅ Deployment Complete!"
 echo "  URL: $SERVICE_URL"
 echo "  Health: ${SERVICE_URL}/health"
+echo ""
+echo "  Firestore auto-seeds on first request if empty."
+echo "  Check: curl ${SERVICE_URL}/health"
 echo "============================================"

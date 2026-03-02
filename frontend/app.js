@@ -724,6 +724,15 @@ function renderMediaCard(data) {
         content.appendChild(desc);
     }
 
+    if (data.action_link) {
+        const link = document.createElement('a');
+        link.className = 'media-card-link';
+        link.href = data.action_link;
+        link.target = '_blank';
+        link.textContent = data.action_label || 'View Details';
+        content.appendChild(link);
+    }
+
     card.appendChild(content);
     container.appendChild(card);
     trimMessageHistory();
@@ -853,6 +862,491 @@ function base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
+// ==================== CHAT MODE ====================
+
+const chatState = {
+    ws: null,
+    isConnected: false,
+    isVoiceMode: false,
+    attachedImageB64: null,
+    recognition: null,  // Web Speech API
+};
+
+function toggleChatPanel() {
+    const panel = document.getElementById('chat-panel');
+    const btn = document.getElementById('btn-chat-toggle');
+    if (panel.style.display === 'none') {
+        panel.style.display = 'flex';
+        btn.style.display = 'none';
+        connectChatWebSocket();
+    } else {
+        closeChatPanel();
+    }
+}
+
+function closeChatPanel() {
+    const panel = document.getElementById('chat-panel');
+    const btn = document.getElementById('btn-chat-toggle');
+    panel.style.display = 'none';
+    btn.style.display = '';
+    disconnectChat();
+    stopChatVoice();
+    closeChatImageSourcePicker();
+}
+
+function connectChatWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const token = getAuthToken();
+    const params = new URLSearchParams();
+    if (token) params.set('token', token);
+    const wsUrl = `${protocol}//${window.location.host}/ws/chat/${state.userId}?${params}`;
+
+    console.log('[Chat WS] Connecting:', wsUrl);
+    chatState.ws = new WebSocket(wsUrl);
+
+    chatState.ws.onopen = () => {
+        console.log('[Chat WS] Connected');
+        chatState.isConnected = true;
+        setChatStatus('Online');
+    };
+
+    chatState.ws.onmessage = (event) => {
+        try {
+            const msg = JSON.parse(event.data);
+            handleChatServerMessage(msg);
+        } catch (err) {
+            console.error('[Chat WS] Parse error:', err);
+        }
+    };
+
+    chatState.ws.onclose = () => {
+        console.log('[Chat WS] Disconnected');
+        chatState.isConnected = false;
+        setChatStatus('Offline');
+    };
+
+    chatState.ws.onerror = (err) => {
+        console.error('[Chat WS] Error:', err);
+    };
+}
+
+function chatWsSend(type, data) {
+    if (chatState.ws && chatState.ws.readyState === WebSocket.OPEN) {
+        chatState.ws.send(JSON.stringify({ type, data }));
+    }
+}
+
+function disconnectChat() {
+    if (chatState.ws) {
+        chatWsSend('end_session', {});
+        chatState.ws.close();
+        chatState.ws = null;
+    }
+    chatState.isConnected = false;
+}
+
+function handleChatServerMessage(msg) {
+    switch (msg.type) {
+        case 'text':
+            addChatMessage('agent', msg.data);
+            setChatStatus('Online');
+            break;
+
+        case 'confirmation_request':
+            renderChatConfirmationCard(msg.data);
+            break;
+
+        case 'confirmation_result':
+            removeChatConfirmationCard(msg.data.action_id);
+            break;
+
+        case 'work_order':
+            addChatMessage('agent', `Work order ${msg.data.wo_id || ''} created: ${msg.data.description || ''}`);
+            break;
+
+        case 'tool_call':
+            setChatStatus('Searching...');
+            break;
+
+        case 'tool_result':
+            setChatStatus('Processing...');
+            break;
+
+        case 'media_card':
+            renderChatMediaCard(msg.data);
+            break;
+
+        case 'status':
+            setChatStatus(msg.data);
+            if (msg.session_id) chatState.sessionId = msg.session_id;
+            break;
+
+        case 'error':
+            addChatMessage('agent', msg.data);
+            setChatStatus('Online');
+            break;
+
+        default:
+            console.log('[Chat WS] Unknown:', msg.type, msg);
+    }
+}
+
+// --- Chat Send ---
+
+function sendChatMessage() {
+    const input = document.getElementById('chat-input');
+    const text = (input.value || '').trim();
+    if (!text && !chatState.attachedImageB64) return;
+    closeChatImageSourcePicker();
+
+    if (chatState.attachedImageB64) {
+        chatWsSend('image', chatState.attachedImageB64);
+        // Show thumbnail in chat
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'message user-message fade-in';
+        const img = document.createElement('img');
+        img.src = document.getElementById('chat-preview-img').src;
+        img.className = 'chat-msg-img';
+        img.alt = 'Attached image';
+        div.appendChild(img);
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+        removeAttachedImage();
+    }
+
+    if (text) {
+        chatWsSend('text', text);
+        addChatMessage('user', text);
+        input.value = '';
+    }
+}
+
+// --- Image Attachment ---
+
+function attachImage() {
+    const picker = document.getElementById('chat-image-source-picker');
+    if (!picker) return;
+    picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
+}
+
+function closeChatImageSourcePicker() {
+    const picker = document.getElementById('chat-image-source-picker');
+    if (picker) picker.style.display = 'none';
+}
+
+function selectChatImageFromCamera() {
+    closeChatImageSourcePicker();
+    document.getElementById('chat-file-input-camera').click();
+}
+
+function selectChatImageFromGallery() {
+    closeChatImageSourcePicker();
+    document.getElementById('chat-file-input-gallery').click();
+}
+
+function handleImageSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        const previewContainer = document.getElementById('chat-image-preview');
+        const previewImg = document.getElementById('chat-preview-img');
+        previewImg.src = dataUrl;
+        previewContainer.style.display = 'flex';
+        chatState.attachedImageB64 = dataUrl.split(',')[1];
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+}
+
+function removeAttachedImage() {
+    chatState.attachedImageB64 = null;
+    document.getElementById('chat-image-preview').style.display = 'none';
+}
+
+// --- Voice Mode (Web Speech API — browser-native speech-to-text) ---
+
+function toggleChatVoice() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        addChatMessage('agent', 'Voice input is not supported in this browser. Try Chrome or Edge.');
+        return;
+    }
+
+    chatState.isVoiceMode = !chatState.isVoiceMode;
+    const btn = document.getElementById('btn-chat-voice');
+
+    if (chatState.isVoiceMode) {
+        btn.classList.add('active');
+        chatState.recognition = new SpeechRecognition();
+        chatState.recognition.continuous = false;
+        chatState.recognition.interimResults = true;
+        chatState.recognition.lang = 'en-US';
+
+        const input = document.getElementById('chat-input');
+
+        chatState.recognition.onresult = (event) => {
+            let transcript = '';
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                transcript += event.results[i][0].transcript;
+            }
+            input.value = transcript;
+            // Auto-send on final result
+            if (event.results[event.results.length - 1].isFinal) {
+                sendChatMessage();
+                // Restart listening
+                if (chatState.isVoiceMode) {
+                    setTimeout(() => {
+                        try { chatState.recognition.start(); } catch (e) { /* already started */ }
+                    }, 300);
+                }
+            }
+        };
+
+        chatState.recognition.onerror = (event) => {
+            console.warn('[Voice] Recognition error:', event.error);
+            if (event.error === 'not-allowed') {
+                addChatMessage('agent', 'Microphone access denied. Please allow mic permissions.');
+                stopChatVoice();
+            }
+        };
+
+        chatState.recognition.onend = () => {
+            // Restart if still in voice mode (recognition auto-stops after silence)
+            if (chatState.isVoiceMode) {
+                try { chatState.recognition.start(); } catch (e) { /* ignore */ }
+            }
+        };
+
+        try {
+            chatState.recognition.start();
+            setChatStatus('Listening...');
+            input.placeholder = 'Listening... speak now';
+        } catch (err) {
+            console.error('[Voice] Start failed:', err);
+            stopChatVoice();
+        }
+    } else {
+        stopChatVoice();
+    }
+}
+
+function stopChatVoice() {
+    chatState.isVoiceMode = false;
+    const btn = document.getElementById('btn-chat-voice');
+    if (btn) btn.classList.remove('active');
+    if (chatState.recognition) {
+        try { chatState.recognition.stop(); } catch (e) { /* ignore */ }
+        chatState.recognition = null;
+    }
+    const input = document.getElementById('chat-input');
+    if (input) input.placeholder = 'Ask Max anything...';
+    setChatStatus(chatState.isConnected ? 'Online' : 'Offline');
+}
+
+// --- Chat UI Helpers ---
+
+function addChatMessage(role, text) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+    const div = document.createElement('div');
+
+    if (role === 'user') {
+        div.className = 'message user-message fade-in';
+    } else if (role === 'agent') {
+        div.className = 'message agent-message fade-in';
+    } else if (role === 'user-transcript') {
+        div.className = 'message transcript transcript-user fade-in';
+    } else if (role === 'agent-transcript') {
+        div.className = 'message transcript transcript-agent fade-in';
+    }
+
+    const p = document.createElement('p');
+    p.textContent = text;
+    div.appendChild(p);
+    container.appendChild(div);
+
+    while (container.childElementCount > MAX_MESSAGE_ITEMS) {
+        container.removeChild(container.firstElementChild);
+    }
+    container.scrollTop = container.scrollHeight;
+}
+
+function setChatStatus(text) {
+    const el = document.getElementById('chat-agent-status');
+    if (el) el.textContent = text;
+}
+
+// --- Chat Confirmation Cards ---
+
+function renderChatConfirmationCard(actionData) {
+    const container = document.getElementById('chat-confirmation-container');
+    if (!container) return;
+
+    const prompt = actionData.confirmation_prompt || actionData;
+    const actionId = actionData.action_id;
+    const actionType = prompt.action_type || 'action';
+    const description = prompt.description || prompt.message || '';
+    const priority = prompt.priority || '';
+    const confidence = prompt.confidence || '';
+    const codes = prompt.codes || '';
+    const priorityClass = /^P[1-5]$/.test(priority) ? priority : '';
+
+    const card = document.createElement('div');
+    card.className = 'confirmation-card';
+    card.id = `chat-confirm-${actionId}`;
+
+    const header = document.createElement('div');
+    header.className = 'confirm-header';
+
+    const badge = document.createElement('span');
+    badge.className = 'confirm-badge';
+    badge.textContent = formatActionType(actionType);
+    header.appendChild(badge);
+
+    if (priority) {
+        const priorityEl = document.createElement('span');
+        priorityEl.className = `confirm-priority${priorityClass ? ` ${priorityClass}` : ''}`;
+        priorityEl.textContent = priority;
+        header.appendChild(priorityEl);
+    }
+
+    if (confidence) {
+        const confidenceEl = document.createElement('span');
+        confidenceEl.className = 'confirm-confidence';
+        confidenceEl.textContent = confidence;
+        header.appendChild(confidenceEl);
+    }
+
+    const descEl = document.createElement('p');
+    descEl.className = 'confirm-description';
+    descEl.textContent = description;
+
+    const actions = document.createElement('div');
+    actions.className = 'confirm-actions';
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'confirm-btn confirm-yes';
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.addEventListener('click', () => chatConfirmAction(actionId));
+
+    const rejectBtn = document.createElement('button');
+    rejectBtn.className = 'confirm-btn confirm-no';
+    rejectBtn.textContent = 'Reject';
+    rejectBtn.addEventListener('click', () => chatRejectAction(actionId));
+
+    const correctBtn = document.createElement('button');
+    correctBtn.className = 'confirm-btn confirm-edit';
+    correctBtn.textContent = 'Correct';
+    correctBtn.addEventListener('click', () => chatCorrectAction(actionId));
+
+    actions.appendChild(confirmBtn);
+    actions.appendChild(rejectBtn);
+    actions.appendChild(correctBtn);
+
+    card.appendChild(header);
+    card.appendChild(descEl);
+    if (codes) {
+        const codesEl = document.createElement('p');
+        codesEl.className = 'confirm-codes';
+        codesEl.textContent = codes;
+        card.appendChild(codesEl);
+    }
+    card.appendChild(actions);
+    container.prepend(card);
+
+    addChatMessage('agent', `Action proposed: ${description}`);
+}
+
+function chatConfirmAction(actionId) {
+    chatWsSend('confirm', { action_id: actionId });
+    removeChatConfirmationCard(actionId);
+    addChatMessage('agent', 'You confirmed the action.');
+}
+
+function chatRejectAction(actionId) {
+    const notes = prompt('Reason for rejection (optional):') || '';
+    chatWsSend('reject', { action_id: actionId, notes });
+    removeChatConfirmationCard(actionId);
+    addChatMessage('agent', 'You rejected the action.');
+}
+
+function chatCorrectAction(actionId) {
+    const input = prompt('What should be changed? (e.g., "priority: P2, problem_code: ME-005")');
+    if (!input) return;
+    const corrections = {};
+    input.split(',').forEach(part => {
+        const [key, val] = part.split(':').map(s => s.trim());
+        if (key && val) corrections[key] = val;
+    });
+    chatWsSend('correct', { action_id: actionId, corrections, notes: input });
+    removeChatConfirmationCard(actionId);
+    addChatMessage('agent', `You corrected the action: ${input}`);
+}
+
+function removeChatConfirmationCard(actionId) {
+    const card = document.getElementById(`chat-confirm-${actionId}`);
+    if (card) {
+        card.style.animation = 'fadeOut 0.3s ease forwards';
+        setTimeout(() => card.remove(), 300);
+    }
+}
+
+// --- Chat Media Cards ---
+
+function renderChatMediaCard(data) {
+    const container = document.getElementById('chat-messages');
+    if (!container) return;
+
+    const card = document.createElement('div');
+    card.className = 'media-card fade-in';
+
+    if (data.image_url) {
+        const img = document.createElement('img');
+        img.className = 'media-card-img';
+        img.src = data.image_url;
+        img.alt = data.title || 'Media';
+        card.appendChild(img);
+    }
+
+    const content = document.createElement('div');
+    content.className = 'media-card-content';
+
+    if (data.title) {
+        const title = document.createElement('h4');
+        title.className = 'media-card-title';
+        title.textContent = data.title;
+        content.appendChild(title);
+    }
+
+    if (data.description) {
+        const desc = document.createElement('p');
+        desc.className = 'media-card-desc';
+        desc.textContent = data.description;
+        content.appendChild(desc);
+    }
+
+    if (data.action_link) {
+        const link = document.createElement('a');
+        link.className = 'media-card-link';
+        link.href = data.action_link;
+        link.target = '_blank';
+        link.textContent = data.action_label || 'View Details';
+        content.appendChild(link);
+    }
+
+    card.appendChild(content);
+    container.appendChild(card);
+
+    while (container.childElementCount > MAX_MESSAGE_ITEMS) {
+        container.removeChild(container.firstElementChild);
+    }
+    container.scrollTop = container.scrollHeight;
+}
+
 // ==================== DASHBOARD ====================
 
 let currentPage = 'work-orders';
@@ -955,10 +1449,12 @@ function showPageState(pageId, state) {
     const empty = page.querySelector('.dash-empty');
     const table = page.querySelector('.data-table');
     const grid = page.querySelector('.data-grid');
+    const list = page.querySelector('.locations-list');
     if (loading) loading.style.display = state === 'loading' ? 'flex' : 'none';
     if (empty) empty.style.display = state === 'empty' ? 'flex' : 'none';
     if (table) table.style.display = state === 'data' ? 'table' : 'none';
     if (grid && state !== 'data') grid.innerHTML = '';
+    if (list) list.style.display = state === 'data' ? 'block' : 'none';
 }
 
 async function apiFetch(url) {
@@ -972,24 +1468,28 @@ async function apiFetch(url) {
 
 async function loadFilterOptions() {
     const DEPARTMENTS = [
-        'Rolling Stock', 'Guideway', 'Power Systems',
-        'Signal & Telecom', 'Facilities', 'Elevating Devices'
+        { value: 'rolling_stock', label: 'Rolling Stock' },
+        { value: 'guideway', label: 'Guideway' },
+        { value: 'power', label: 'Power Systems' },
+        { value: 'signal_telecom', label: 'Signal & Telecom' },
+        { value: 'facilities', label: 'Facilities' },
+        { value: 'elevating_devices', label: 'Elevating Devices' },
     ];
     const PRIORITIES = ['P1', 'P2', 'P3', 'P4', 'P5'];
     const STATUSES = ['open', 'in_progress', 'on_hold', 'completed', 'cancelled'];
-    const CODE_TYPES = ['problem', 'fault', 'action'];
+    const CODE_TYPES = ['Problem Code', 'Fault Code', 'Action Code'];
 
     // WO filters
     populateDropdown('wo-filter-status', STATUSES, s => formatLabel(s));
     populateDropdown('wo-filter-priority', PRIORITIES, p => p);
-    populateDropdown('wo-filter-department', DEPARTMENTS, d => d);
+    populateDropdown('wo-filter-department', DEPARTMENTS);
     // Asset filters
-    populateDropdown('asset-filter-department', DEPARTMENTS, d => d);
+    populateDropdown('asset-filter-department', DEPARTMENTS);
     // KB filter
-    populateDropdown('kb-filter-department', DEPARTMENTS, d => d);
+    populateDropdown('kb-filter-department', DEPARTMENTS);
     // EAM filters
     populateDropdown('eam-filter-type', CODE_TYPES, t => formatLabel(t));
-    populateDropdown('eam-filter-department', DEPARTMENTS, d => d);
+    populateDropdown('eam-filter-department', DEPARTMENTS);
 
     // Load locations for WO filter + asset station filter
     try {

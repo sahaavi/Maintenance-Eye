@@ -1,12 +1,31 @@
 # AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents working with this repository.
 
 ## Project Overview
 
 Maintenance-Eye is an AI co-pilot for physical infrastructure maintenance, built for the Google Gemini Live Agent Challenge hackathon. Field technicians point their phone camera at equipment, speak naturally, and an ADK agent (persona: "Max") identifies faults via live video, auto-classifies using EAM codes, creates work orders with human-in-the-loop confirmation, and generates inspection reports.
 
 **Category**: Live Agents (real-time audio+vision with barge-in interruption)
+
+## Working with This Project
+
+This project follows the workflow principles defined in `RULES.md`.
+
+## Mandatory RULES Workflow
+
+Follow this sequence on every feature, fix, and refactor:
+
+1. Read `RULES.md` before implementation if you have not read it in the current session.
+2. Create or update a scoped plan in `tasks/todo.md` before writing code.
+3. Update `tasks/todo.md` continuously while working (mark done items, add WIP notes, and record milestone summaries).
+4. After each correction, failed assumption, or bug fix, append a lesson entry to `tasks/lessons.md` with context, root cause, solution, and a durable rule.
+5. Run verification steps required by `RULES.md` before marking work complete, then log the review outcome in `tasks/todo.md`.
+6. If architecture, workflow, or operating assumptions changed, reflect that change in this file and sibling agent guidance files.
+
+Path convention:
+- Canonical lessons log is `tasks/lessons.md` (plural).
+- Do not use `tasks/lesson.md`.
 
 ## Development Commands
 
@@ -29,6 +48,25 @@ python scripts/seed_data.py
 # Deploy to GCP
 ./scripts/deploy.sh <project-id> <gemini-api-key> [region]
 ```
+
+## Test System Commands
+
+```bash
+# One-time test environment bootstrap
+./scripts/setup_test_env.sh
+source .venv/bin/activate
+
+# Run full production test gate (env-aware)
+TEST_ENV=dev ./scripts/run_test_suite.sh
+
+# Run layered suites directly
+python -m pytest -m "unit or integration or api"
+python -m pytest -m "security or ai or data"
+python -m pytest -m "performance"
+python -m pytest -m "e2e"
+```
+
+CI pipeline: `.github/workflows/test-suite.yml` (quality, security, core pytest, and Playwright E2E jobs with artifact upload).
 
 No test suite or linter is currently configured.
 
@@ -72,15 +110,16 @@ Phone PWA ──WebSocket──▶ FastAPI ──ADK Runner──▶ Gemini 2.5 
 - `models/schemas.py` — Pydantic models (Asset, WorkOrder, EAMCode, InspectionRecord, etc.)
 
 **Frontend** (`frontend/`): Vanilla HTML/CSS/JS PWA. No build step.
-- `app.js` — Single-file client: WebSocket streaming, camera capture (2 FPS JPEG), mic capture (PCM 16kHz), audio playback (PCM 24kHz), confirmation card UI
-- `index.html` — Three screens: splash, inspection (camera+agent), dashboard (data explorer)
+- `app.js` — Single-file client: WebSocket streaming, camera capture (2 FPS JPEG), mic capture (PCM 16kHz), audio playback (PCM 24kHz), confirmation card UI, 5-page data explorer with debounced search + filter dropdowns
+- `index.html` — Three screens: splash, inspection (camera+agent), dashboard (5-page enterprise explorer: Work Orders, Assets, Locations, Knowledge Base, EAM Codes)
+- `style.css` — Enterprise dashboard styles: sidebar nav (desktop), bottom nav (mobile), filter bars, data tables, status/priority badges
 
 **Infrastructure**: Docker (Python 3.12-slim), Cloud Run (0-3 instances), Terraform, Cloud Build CI/CD.
 
 ## Key Design Patterns
 
 - **Human-in-the-loop**: Agent proposes critical actions via `propose_action()` → technician confirms/rejects/corrects via WebSocket → only then executes `manage_work_order()`
-- **Firestore fallback**: REST routes fall back to `data/seed_data.json` if Firestore is unavailable
+- **Firestore fallback**: REST routes AND agent tools fall back to `JsonEAM` (backed by `data/seed_data.json`) if Firestore is unavailable; `get_eam_service()` singleton handles this transparently
 - **EAM abstraction**: `EAMService` interface allows swapping database backends without changing agent tools
 - **Audio streaming**: Client sends PCM 16kHz, receives PCM 24kHz; bidirectional via WebSocket with ADK LiveRequestQueue
 - **Session management**: In-memory only (stateless Cloud Run), per-session confirmation manager

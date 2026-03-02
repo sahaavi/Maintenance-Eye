@@ -95,9 +95,22 @@ class JsonEAM(EAMService):
                 if station.lower() not in loc.get("station", "").lower():
                     continue
             if query:
-                ql = query.lower()
-                searchable = f"{a.get('name','')} {a.get('asset_id','')} {a.get('location',{}).get('station','')}".lower()
-                if ql not in searchable:
+                searchable = " ".join([
+                    a.get("name", ""),
+                    a.get("asset_id", ""),
+                    a.get("type", ""),
+                    a.get("department", ""),
+                    a.get("equipment_code", ""),
+                    a.get("manufacturer", ""),
+                    a.get("model", ""),
+                    a.get("location", {}).get("station", ""),
+                    a.get("location", {}).get("station_code", ""),
+                    a.get("location", {}).get("zone", ""),
+                    " ".join(a.get("asset_hierarchy", [])),
+                ]).lower()
+                # Tokenized matching: all query words must appear in searchable text
+                query_tokens = query.lower().split()
+                if not all(token in searchable for token in query_tokens):
                     continue
             results.append(Asset(**a))
         return results
@@ -190,7 +203,6 @@ class JsonEAM(EAMService):
             if dept_asset_ids is not None and wo.get("asset_id") not in dept_asset_ids:
                 continue
             if q:
-                ql = q.lower()
                 searchable = " ".join([
                     wo.get("wo_id", ""),
                     wo.get("description", ""),
@@ -198,8 +210,12 @@ class JsonEAM(EAMService):
                     wo.get("problem_code", ""),
                     wo.get("fault_code", ""),
                     wo.get("action_code", ""),
+                    wo.get("assigned_to", ""),
+                    wo.get("equipment_id", ""),
                 ]).lower()
-                if ql not in searchable:
+                # Tokenized matching: all query words must appear
+                query_tokens = q.lower().split()
+                if not all(token in searchable for token in query_tokens):
                     continue
             results.append(WorkOrder(**wo))
         return results

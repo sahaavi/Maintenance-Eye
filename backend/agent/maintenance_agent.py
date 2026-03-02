@@ -9,7 +9,7 @@ from typing import Optional
 from google.adk.agents import Agent
 
 from config import settings
-from agent.prompts import SYSTEM_PROMPT, AGENT_NAME
+from agent.prompts import SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT, AGENT_NAME
 from agent.tools.asset_lookup import lookup_asset
 from agent.tools.inspection_history import get_inspection_history
 from agent.tools.knowledge_search import search_knowledge_base
@@ -58,6 +58,40 @@ def create_maintenance_agent() -> Agent:
     return agent
 
 
-# Module-level agent instance — used by the Runner in main.py
+def create_chat_agent() -> Agent:
+    """
+    Create the text-chat variant of the Maintenance-Eye agent.
+
+    Uses GEMINI_MODEL (gemini-2.5-flash) for clean text responses
+    instead of the native audio model. Same tools, tailored prompt.
+    """
+    agent = Agent(
+        name=AGENT_NAME,
+        model=settings.GEMINI_MODEL,
+        description=(
+            "AI maintenance co-pilot for text-based chat. Helps technicians "
+            "look up assets, analyze photos, manage work orders, and answer "
+            "maintenance questions via text."
+        ),
+        instruction=CHAT_SYSTEM_PROMPT,
+        tools=[
+            lookup_asset,
+            get_inspection_history,
+            search_knowledge_base,
+            manage_work_order,
+            get_safety_protocol,
+            generate_report,
+            propose_action,
+            check_pending_actions,
+        ],
+    )
+
+    logger.info(f"Created Chat Agent '{AGENT_NAME}' with {len(agent.tools)} tools")
+    logger.info(f"  Model: {settings.GEMINI_MODEL}")
+    return agent
+
+
+# Module-level agent instances — used by Runners in main.py
 maintenance_agent = create_maintenance_agent()
+chat_agent = create_chat_agent()
 

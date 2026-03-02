@@ -1,0 +1,42 @@
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+include = "\\.pyi?$"
+exclude = """
+/(
+    '\\.git'
+  | '\\.venv'
+  | 'venv'
+  | 'dist'
+  | 'build'
+)/
+"""
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["venv", ".venv", "dist", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ASYNC", "RUF"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend", "tests"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+exclude = ["venv", "\\.venv"]
+
+[[tool.mypy.overrides]]
+module = [
+    "google.*",
+    "firebase_admin.*",
+    "weasyprint.*",
+]
+ignore_missing_imports = true

@@ -150,8 +150,12 @@ resource "google_cloud_run_v2_service" "app" {
         value = "production"
       }
       env {
+        name  = "LOG_LEVEL"
+        value = "DEBUG"
+      }
+      env {
         name  = "ENABLE_AUTH"
-        value = "true"
+        value = "false"
       }
       env {
         name  = "FIREBASE_PROJECT_ID"

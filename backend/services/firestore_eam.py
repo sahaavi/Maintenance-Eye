@@ -9,6 +9,8 @@ from typing import Optional
 from datetime import datetime
 
 from google.cloud import firestore
+import google.auth
+from google.auth.exceptions import DefaultCredentialsError
 
 from config import settings
 from models.schemas import (
@@ -69,16 +71,26 @@ class FirestoreEAM(EAMService):
         docs = ref.stream()
         results = []
         async for doc in docs:
-            asset = Asset(**doc.to_dict())
+            data = doc.to_dict()
+            asset = Asset(**data)
             # Client-side filtering for text search (Firestore limitation)
             if query:
-                q_lower = query.lower()
-                if (
-                    q_lower in asset.name.lower()
-                    or q_lower in asset.asset_id.lower()
-                    or q_lower in asset.location.station.lower()
-                    or q_lower in asset.location.station_code.lower()
-                ):
+                searchable = " ".join([
+                    asset.name,
+                    asset.asset_id,
+                    asset.type,
+                    asset.department,
+                    data.get("equipment_code", ""),
+                    data.get("manufacturer", ""),
+                    data.get("model", ""),
+                    asset.location.station,
+                    asset.location.station_code,
+                    getattr(asset.location, "zone", ""),
+                    " ".join(data.get("asset_hierarchy", [])),
+                ]).lower()
+                # Tokenized matching: all query words must appear
+                query_tokens = query.lower().split()
+                if all(token in searchable for token in query_tokens):
                     results.append(asset)
             elif station:
                 if station.lower() in asset.location.station.lower():
@@ -205,7 +217,6 @@ class FirestoreEAM(EAMService):
             if dept_asset_ids is not None and wo.get("asset_id") not in dept_asset_ids:
                 continue
             if q:
-                ql = q.lower()
                 searchable = " ".join([
                     wo.get("wo_id", ""),
                     wo.get("description", ""),
@@ -213,8 +224,12 @@ class FirestoreEAM(EAMService):
                     wo.get("problem_code", ""),
                     wo.get("fault_code", ""),
                     wo.get("action_code", ""),
+                    wo.get("assigned_to", ""),
+                    wo.get("equipment_id", ""),
                 ]).lower()
-                if ql not in searchable:
+                # Tokenized matching: all query words must appear
+                query_tokens = q.lower().split()
+                if not all(token in searchable for token in query_tokens):
                     continue
             results.append(WorkOrder(**wo))
         return results
@@ -344,6 +359,24 @@ class FirestoreEAM(EAMService):
 _eam_service: Optional[EAMService] = None
 
 
+def _has_firestore_runtime() -> bool:
+    """
+    Detect whether Firestore can be used in this runtime.
+    - Emulator host always enables Firestore.
+    - Otherwise require valid ADC credentials.
+    """
+    if settings.FIRESTORE_EMULATOR_HOST:
+        return True
+    try:
+        google.auth.default()
+        return True
+    except DefaultCredentialsError:
+        return False
+    except Exception as exc:
+        logger.debug(f"Failed checking ADC credentials: {exc}")
+        return False
+
+
 def get_eam_service() -> EAMService:
     """Get or create the singleton EAM service instance.
 
@@ -354,8 +387,8 @@ def get_eam_service() -> EAMService:
     if _eam_service is not None:
         return _eam_service
 
-    # Try Firestore when emulator is running or in production
-    if settings.FIRESTORE_EMULATOR_HOST or settings.APP_ENV == "production":
+    # Try Firestore when emulator or ADC credentials are available.
+    if _has_firestore_runtime():
         try:
             _eam_service = FirestoreEAM()
             return _eam_service
