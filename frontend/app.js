@@ -30,6 +30,11 @@ const state = {
     videoInterval: null,
     sessionStartTime: null,
     timerInterval: null,
+    hudInterval: null,
+    // Transcript buffering — accumulate fragments into single bubbles
+    currentTranscriptEl: null,       // DOM element for current transcript bubble
+    currentTranscriptSpeaker: null,  // 'You' or 'Max'
+    transcriptFlushTimer: null,      // Timer to finalize bubble after silence
 };
 
 // Audio config
@@ -362,7 +367,13 @@ function handleServerMessage(msg) {
             }
             break;
 
+        case 'turn_complete':
+            _finalizeTranscriptBubble();
+            setAgentStatus('Listening...');
+            break;
+
         case 'interrupted':
+            _finalizeTranscriptBubble();
             clearPlaybackQueue();
             setAgentStatus('Listening...');
             break;
@@ -384,6 +395,7 @@ function handleServerMessage(msg) {
             break;
 
         case 'tool_call':
+            _finalizeTranscriptBubble();
             setAgentStatus('Using tool...');
             setHudActive(true);
             break;
@@ -579,6 +591,7 @@ async function startInspection() {
 
     state.sessionStartTime = Date.now();
     state.timerInterval = setInterval(updateTimer, 1000);
+    state.hudInterval = setInterval(updateHudData, 1000);
 
     connectWebSocket();
 }
@@ -619,6 +632,10 @@ async function endInspection() {
     void stopPlayback();
     stopCamera();
     clearInterval(state.timerInterval);
+    if (state.hudInterval) {
+        clearInterval(state.hudInterval);
+        state.hudInterval = null;
+    }
 
     if (state.ws) {
         state.ws.close();
@@ -679,7 +696,7 @@ function capturePhoto() {
 
     // Flash effect
     const overlay = document.getElementById('camera-overlay');
-    overlay.style.background = 'rgba(255, 255, 255, 0.3)';
+    overlay.style.background = 'rgba(255, 255, 255, 0.8)';
     setTimeout(() => { overlay.style.background = 'transparent'; }, 150);
 
     addUserMessage('📸 Photo captured and sent');
@@ -769,16 +786,47 @@ function addTranscript(speaker, text) {
     if (!text || !text.trim()) return;
     const container = el.agentMessages();
     const cls = speaker === 'You' ? 'transcript-user' : 'transcript-agent';
-    const div = document.createElement('div');
-    div.className = `message transcript ${cls} fade-in`;
-    const speakerEl = document.createElement('span');
-    speakerEl.className = 'transcript-speaker';
-    speakerEl.textContent = `${speaker}:`;
-    div.appendChild(speakerEl);
-    div.appendChild(document.createTextNode(` ${text}`));
-    container.appendChild(div);
+
+    // If speaker changed or no active bubble, start a new one
+    if (state.currentTranscriptSpeaker !== speaker || !state.currentTranscriptEl
+        || !container.contains(state.currentTranscriptEl)) {
+        _finalizeTranscriptBubble();
+        const div = document.createElement('div');
+        div.className = `message transcript ${cls} fade-in`;
+        const speakerEl = document.createElement('span');
+        speakerEl.className = 'transcript-speaker';
+        speakerEl.textContent = `${speaker}:`;
+        div.appendChild(speakerEl);
+        const textNode = document.createElement('span');
+        textNode.className = 'transcript-text';
+        textNode.textContent = ` ${text}`;
+        div.appendChild(textNode);
+        container.appendChild(div);
+        state.currentTranscriptEl = div;
+        state.currentTranscriptSpeaker = speaker;
+    } else {
+        // Append to existing bubble
+        const textSpan = state.currentTranscriptEl.querySelector('.transcript-text');
+        if (textSpan) {
+            textSpan.textContent += ` ${text}`;
+        }
+    }
+
+    // Reset flush timer — finalize bubble after 3s of silence (turn boundary)
+    if (state.transcriptFlushTimer) clearTimeout(state.transcriptFlushTimer);
+    state.transcriptFlushTimer = setTimeout(() => _finalizeTranscriptBubble(), 3000);
+
     trimMessageHistory();
     container.scrollTop = container.scrollHeight;
+}
+
+function _finalizeTranscriptBubble() {
+    if (state.transcriptFlushTimer) {
+        clearTimeout(state.transcriptFlushTimer);
+        state.transcriptFlushTimer = null;
+    }
+    state.currentTranscriptEl = null;
+    state.currentTranscriptSpeaker = null;
 }
 
 function addFinding(finding) {
@@ -820,6 +868,30 @@ function updateTimer() {
     const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
     const secs = String(elapsed % 60).padStart(2, '0');
     el.sessionTimer().textContent = `${mins}:${secs}`;
+}
+
+function updateHudData() {
+    const latEl = document.getElementById('hud-lat');
+    const lngEl = document.getElementById('hud-lng');
+    const fpsEl = document.getElementById('hud-fps');
+    const bitEl = document.getElementById('hud-bit');
+
+    if (latEl && Math.random() > 0.5) {
+        const baseLat = 49.2827;
+        const jitter = (Math.random() - 0.5) * 0.0005;
+        latEl.textContent = `LAT: ${(baseLat + jitter).toFixed(4)}`;
+    }
+    if (lngEl && Math.random() > 0.5) {
+        const baseLng = -123.1207;
+        const jitter = (Math.random() - 0.5) * 0.0005;
+        lngEl.textContent = `LNG: ${(baseLng + jitter).toFixed(4)}`;
+    }
+    if (fpsEl) {
+        fpsEl.textContent = `FPS: ${Math.floor(28 + Math.random() * 4)}`;
+    }
+    if (bitEl) {
+        bitEl.textContent = `BIT: ${(2.0 + Math.random() * 0.6).toFixed(1)}Mb`;
+    }
 }
 
 function updateConnectionStatus(connected) {

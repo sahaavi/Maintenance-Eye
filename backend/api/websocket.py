@@ -177,10 +177,27 @@ async def _execute_confirmed_action(action: PendingAction) -> dict:
     action_type = action.action_type
 
     if action_type == ActionType.CREATE_WORK_ORDER:
+        effective_asset_id = payload.get("asset_id", action.asset_id)
+        effective_description = payload.get("description", action.description)
+        missing_fields = []
+        if not (effective_asset_id or "").strip():
+            missing_fields.append("asset_id")
+        if not (effective_description or "").strip():
+            missing_fields.append("description")
+        if missing_fields:
+            return {
+                "success": False,
+                "error": (
+                    "Cannot execute confirmed create_work_order; missing required fields: "
+                    + ", ".join(missing_fields)
+                ),
+                "missing_fields": missing_fields,
+            }
+
         return await manage_work_order(
             action="create",
-            asset_id=payload.get("asset_id", action.asset_id),
-            description=payload.get("description", action.description),
+            asset_id=effective_asset_id,
+            description=effective_description,
             problem_code=payload.get("problem_code", ""),
             fault_code=payload.get("fault_code", ""),
             action_code=payload.get("action_code", ""),
@@ -369,11 +386,16 @@ async def _run_bidi_session(
                     action = confirmation_mgr.confirm(action_id, notes)
                     if action:
                         execution = await _execute_confirmed_action(action)
-                        # Tell the agent about the confirmation via text
+                        # Tell the agent the action was already executed by the system
+                        wo_id = ""
+                        if execution.get("success") and execution.get("work_order"):
+                            wo_id = execution["work_order"].get("wo_id", "")
                         content = types.Content(
                             parts=[types.Part(
-                                text=f"The technician CONFIRMED action {action_id}. "
-                                     f"Proceed with: {action.description}"
+                                text=f"[SYSTEM] Action {action_id} was CONFIRMED and ALREADY EXECUTED by the system. "
+                                     f"{'Work order ' + wo_id + ' was created. ' if wo_id else ''}"
+                                     f"Do NOT call manage_work_order again — the action is complete. "
+                                     f"Just acknowledge the result to the technician briefly."
                             )]
                         )
                         live_request_queue.send_content(content)
@@ -410,9 +432,9 @@ async def _run_bidi_session(
                     if action:
                         content = types.Content(
                             parts=[types.Part(
-                                text=f"The technician REJECTED action {action_id}. "
+                                text=f"[SYSTEM] The technician REJECTED action {action_id}. "
                                      f"Reason: {notes or 'No reason given'}. "
-                                     f"Ask if they want a different approach."
+                                     f"Acknowledge briefly and ask if they want a different approach."
                             )]
                         )
                         live_request_queue.send_content(content)
@@ -440,11 +462,14 @@ async def _run_bidi_session(
                     action = confirmation_mgr.correct(action_id, corrections, notes)
                     if action:
                         execution = await _execute_confirmed_action(action)
+                        wo_id = ""
+                        if execution.get("success") and execution.get("work_order"):
+                            wo_id = execution["work_order"].get("wo_id", "")
                         content = types.Content(
                             parts=[types.Part(
-                                text=f"The technician CORRECTED action {action_id}. "
-                                     f"Updated values: {json.dumps(corrections)}. "
-                                     f"Use these corrected values."
+                                text=f"[SYSTEM] Action {action_id} was CORRECTED and ALREADY EXECUTED with updated values. "
+                                     f"{'Work order ' + wo_id + ' was created. ' if wo_id else ''}"
+                                     f"Do NOT call manage_work_order again. Just acknowledge briefly."
                             )]
                         )
                         live_request_queue.send_content(content)
@@ -556,25 +581,31 @@ async def _run_bidi_session(
                                 "mime_type": part.inline_data.mime_type or f"audio/pcm;rate={RECEIVE_SAMPLE_RATE}",
                             })
 
-                        # Text response
+                        # Text: transcription fragments or model reasoning
                         elif part.text:
-                            await websocket.send_json({
-                                "type": "text",
-                                "data": part.text,
-                            })
+                            if getattr(event, "partial", False):
+                                # Partial = live transcription fragment (word-by-word)
+                                role = getattr(event.content, "role", "model")
+                                msg_type = "transcript_input" if role == "user" else "transcript_output"
+                                text = part.text
+                                # Filter out model thinking/reasoning from transcripts.
+                                # Gemini sometimes speaks its thought process aloud—
+                                # strip bold markdown headers that indicate thinking.
+                                if msg_type == "transcript_output" and text.strip().startswith("**"):
+                                    continue
+                                await websocket.send_json({
+                                    "type": msg_type,
+                                    "data": text,
+                                })
+                            # Non-partial text in live audio mode = model internal
+                            # reasoning/thinking (not speech). Suppress it — the
+                            # agent communicates via audio, not text bubbles.
 
-                # --- Transcription of user's speech (input) ---
-                if hasattr(event, "input_transcription") and event.input_transcription:
+                # --- Turn complete ---
+                if getattr(event, "turn_complete", False):
                     await websocket.send_json({
-                        "type": "transcript_input",
-                        "data": str(event.input_transcription),
-                    })
-
-                # --- Transcription of agent's speech (output) ---
-                if hasattr(event, "output_transcription") and event.output_transcription:
-                    await websocket.send_json({
-                        "type": "transcript_output",
-                        "data": str(event.output_transcription),
+                        "type": "turn_complete",
+                        "data": "",
                     })
 
                 # --- Interruption (barge-in) ---

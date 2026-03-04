@@ -46,6 +46,11 @@ class EAMService(ABC):
 
     # --- Work Order Operations ---
     @abstractmethod
+    async def get_work_order(self, wo_id: str) -> Optional[WorkOrder]:
+        """Look up a single work order by its ID."""
+        ...
+
+    @abstractmethod
     async def create_work_order(self, work_order: WorkOrder) -> WorkOrder:
         """Create a new work order and return it with generated ID."""
         ...

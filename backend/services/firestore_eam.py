@@ -5,6 +5,7 @@ with synthetic data for the hackathon.
 """
 
 import logging
+import re
 from typing import Optional
 from datetime import datetime
 
@@ -89,7 +90,7 @@ class FirestoreEAM(EAMService):
                     " ".join(data.get("asset_hierarchy", [])),
                 ]).lower()
                 # Tokenized matching: all query words must appear
-                query_tokens = query.lower().split()
+                query_tokens = re.findall(r"[a-zA-Z0-9]+", query.lower())
                 if all(token in searchable for token in query_tokens):
                     results.append(asset)
             elif station:
@@ -100,6 +101,12 @@ class FirestoreEAM(EAMService):
         return results
 
     # --- Work Order Operations ---
+
+    async def get_work_order(self, wo_id: str) -> Optional[WorkOrder]:
+        doc = await self.db.collection("work_orders").document(wo_id).get()
+        if doc.exists:
+            return WorkOrder(**doc.to_dict())
+        return None
 
     async def create_work_order(self, work_order: WorkOrder) -> WorkOrder:
         # Generate WO ID using a transaction to avoid duplicate counters
@@ -208,27 +215,41 @@ class FirestoreEAM(EAMService):
             if department:
                 dept_asset_ids = dept_ids
 
+        # Fetch all assets for joining/enriching the search results
+        # In a real system we would use more efficient joins/indices, but
+        # for synthetic data and small collections, this is robust.
+        asset_map = {}
+        asset_docs = self.db.collection("assets").stream()
+        async for doc in asset_docs:
+            a = doc.to_dict()
+            asset_map[a.get("asset_id", "")] = a
+
         docs = ref.stream()
         results = []
         async for doc in docs:
             wo = doc.to_dict()
-            if location_asset_ids is not None and wo.get("asset_id") not in location_asset_ids:
+            aid = wo.get("asset_id", "")
+            asset = asset_map.get(aid, {})
+
+            if location_asset_ids is not None and aid not in location_asset_ids:
                 continue
-            if dept_asset_ids is not None and wo.get("asset_id") not in dept_asset_ids:
+            if dept_asset_ids is not None and aid not in dept_asset_ids:
                 continue
+
             if q:
                 searchable = " ".join([
                     wo.get("wo_id", ""),
                     wo.get("description", ""),
-                    wo.get("asset_id", ""),
+                    aid,
+                    asset.get("name", ""),
+                    asset.get("location", {}).get("station", ""),
                     wo.get("problem_code", ""),
                     wo.get("fault_code", ""),
                     wo.get("action_code", ""),
                     wo.get("assigned_to", ""),
-                    wo.get("equipment_id", ""),
                 ]).lower()
                 # Tokenized matching: all query words must appear
-                query_tokens = q.lower().split()
+                query_tokens = re.findall(r"[a-zA-Z0-9]+", q.lower())
                 if not all(token in searchable for token in query_tokens):
                     continue
             results.append(WorkOrder(**wo))
@@ -290,19 +311,42 @@ class FirestoreEAM(EAMService):
     async def get_inspection_history(
         self, asset_id: str, limit: int = 10
     ) -> list[InspectionRecord]:
-        ref = (
-            self.db.collection("inspections")
-            .where(filter=firestore.FieldFilter("asset_id", "==", asset_id))
-            .order_by("date", direction=firestore.Query.DESCENDING)
-            .limit(limit)
-        )
-        docs = ref.stream()
-        results = []
-        async for doc in docs:
-            results.append(InspectionRecord(**doc.to_dict()))
-        return results
+        try:
+            ref = (
+                self.db.collection("inspections")
+                .where(filter=firestore.FieldFilter("asset_id", "==", asset_id))
+                .order_by("date", direction=firestore.Query.DESCENDING)
+                .limit(limit)
+            )
+            docs = ref.stream()
+            results = []
+            async for doc in docs:
+                results.append(InspectionRecord(**doc.to_dict()))
+            return results
+        except Exception as e:
+            # Fallback for missing indices in production Cloud Firestore
+            if "index" in str(e).lower() or "precondition" in str(e).lower() or "400" in str(e):
+                logger.warning(f"Inspection history index missing for {asset_id}, falling back to unordered search: {e}")
+                ref = (
+                    self.db.collection("inspections")
+                    .where(filter=firestore.FieldFilter("asset_id", "==", asset_id))
+                    .limit(limit)
+                )
+                docs = ref.stream()
+                results = []
+                async for doc in docs:
+                    results.append(InspectionRecord(**doc.to_dict()))
+                return sorted(results, key=lambda r: r.date, reverse=True)
+            raise e
 
     # --- Knowledge Base ---
+
+    # Words that describe document type, not content — strip from KB queries
+    _KB_META_WORDS = frozenset({
+        "protocol", "procedure", "manual", "guide", "guidelines", "standard",
+        "standards", "document", "checklist", "instructions", "handbook",
+        "specification", "reference", "sop",
+    })
 
     async def search_knowledge_base(
         self, query: str, asset_type: str = "", department: str = ""
@@ -313,18 +357,21 @@ class FirestoreEAM(EAMService):
 
         docs = ref.stream()
         results = []
-        q_lower = query.lower()
+        # Robust tokenization
+        query_tokens = [
+            t for t in re.findall(r"[a-zA-Z0-9]+", query.lower())
+            if t not in self._KB_META_WORDS
+        ] if query else []
+        
         async for doc in docs:
             entry = KnowledgeBaseEntry(**doc.to_dict())
-            # Client-side text matching
-            if (
-                q_lower in entry.title.lower()
-                or q_lower in entry.content.lower()
-                or any(q_lower in tag.lower() for tag in entry.tags)
-            ):
-                if asset_type and asset_type not in entry.asset_types:
+            if asset_type and asset_type not in entry.asset_types:
+                continue
+            if query_tokens:
+                searchable = f"{entry.title} {entry.content} {' '.join(entry.tags)}".lower()
+                if not all(token in searchable for token in query_tokens):
                     continue
-                results.append(entry)
+            results.append(entry)
         return results
 
     # --- Feedback Loop ---

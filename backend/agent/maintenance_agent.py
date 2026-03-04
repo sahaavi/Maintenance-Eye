@@ -17,6 +17,7 @@ from agent.tools.work_order import manage_work_order
 from agent.tools.safety_protocol import get_safety_protocol
 from agent.tools.report_generator import generate_report
 from agent.tools.confirm_action import propose_action, check_pending_actions
+from agent.tools.smart_search import smart_search
 
 logger = logging.getLogger("maintenance-eye.agent")
 
@@ -42,6 +43,7 @@ def create_maintenance_agent() -> Agent:
         ),
         instruction=SYSTEM_PROMPT,
         tools=[
+            smart_search,
             lookup_asset,
             get_inspection_history,
             search_knowledge_base,
@@ -75,6 +77,7 @@ def create_chat_agent() -> Agent:
         ),
         instruction=CHAT_SYSTEM_PROMPT,
         tools=[
+            smart_search,
             lookup_asset,
             get_inspection_history,
             search_knowledge_base,

@@ -82,6 +82,26 @@ def propose_action(
                      f"Must be one of: {[e.value for e in ActionType]}"
         }
 
+    if at == ActionType.CREATE_WORK_ORDER:
+        missing_fields: list[str] = []
+        if not (asset_id or "").strip():
+            missing_fields.append("asset_id")
+        if not (description or "").strip():
+            missing_fields.append("description")
+        if missing_fields:
+            return {
+                "success": False,
+                "error": (
+                    "Cannot propose create_work_order without required fields: "
+                    + ", ".join(missing_fields)
+                ),
+                "missing_fields": missing_fields,
+                "instructions": (
+                    "Ask the technician for the missing required details before "
+                    "proposing work-order creation."
+                ),
+            }
+
     mgr = get_confirmation_manager(_get_session_context())
 
     proposed_data = {}
@@ -138,9 +158,10 @@ def propose_action(
             ),
         },
         "instructions": (
-            "WAIT for the technician to respond. "
-            "They will confirm, reject, or provide corrections. "
-            "Do NOT proceed until you receive their response."
+            "A confirmation card is now showing on the technician's screen with all details. "
+            "Do NOT repeat the details aloud — just give a brief one-sentence summary like "
+            "'I've proposed closing that work order. Please confirm on your screen.' "
+            "WAIT for the technician to respond. Do NOT proceed until they confirm or reject."
         ),
     }
 

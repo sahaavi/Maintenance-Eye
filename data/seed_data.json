@@ -873,6 +873,371 @@
       "description": "Reset control system parameters",
       "related_codes": [],
       "hexagon_mapping": "HX-A-RESET"
+    },
+    {
+      "code_type": "problem_code",
+      "code": "ME-021",
+      "label": "Step Defect",
+      "department": "elevating_devices",
+      "asset_types": [
+        "escalator"
+      ],
+      "description": "Escalator step deformation, sag, or misalignment causing uneven riding surface",
+      "related_codes": [
+        "STEP-SAG",
+        "ADJUST"
+      ],
+      "hexagon_mapping": "HX-P-021"
+    },
+    {
+      "code_type": "problem_code",
+      "code": "ME-022",
+      "label": "Motor Vibration",
+      "department": "elevating_devices",
+      "asset_types": [
+        "escalator",
+        "elevator"
+      ],
+      "description": "Excessive vibration or grinding noise from drive motor or gearbox",
+      "related_codes": [
+        "MTR-VIB",
+        "MTR-BRG",
+        "REPLACE"
+      ],
+      "hexagon_mapping": "HX-P-022"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "STEP-SAG",
+      "label": "Step Sag/Deformation",
+      "department": "elevating_devices",
+      "asset_types": [
+        "escalator"
+      ],
+      "description": "Escalator step sagging beyond tolerance, creating trip hazard or uneven surface",
+      "related_codes": [
+        "ME-021",
+        "ME-003"
+      ],
+      "hexagon_mapping": "HX-F-021"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "MTR-VIB",
+      "label": "Motor Vibration/Grinding",
+      "department": "elevating_devices",
+      "asset_types": [
+        "escalator",
+        "elevator"
+      ],
+      "description": "Drive motor producing abnormal vibration, grinding noise, or resonance indicating bearing wear or misalignment",
+      "related_codes": [
+        "ME-022",
+        "ME-008"
+      ],
+      "hexagon_mapping": "HX-F-022"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "MTR-BRG",
+      "label": "Motor Bearing Failure",
+      "department": "elevating_devices",
+      "asset_types": [
+        "escalator",
+        "elevator"
+      ],
+      "description": "Drive motor bearing worn, pitted, or seized causing noise and heat generation",
+      "related_codes": [
+        "ME-022",
+        "MTR-VIB"
+      ],
+      "hexagon_mapping": "HX-F-023"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "LUB-DRY",
+      "label": "Insufficient Lubrication",
+      "department": "elevating_devices",
+      "asset_types": [
+        "escalator",
+        "elevator",
+        "switch_machine"
+      ],
+      "description": "Inadequate lubrication on chains, bearings, or moving components causing friction and accelerated wear",
+      "related_codes": [
+        "ME-006",
+        "LUBRICATE"
+      ],
+      "hexagon_mapping": "HX-F-024"
+    },
+    {
+      "code_type": "problem_code",
+      "code": "ME-023",
+      "label": "Door System Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "door_system"
+      ],
+      "description": "Train door failure to open, close, or lock properly",
+      "related_codes": [
+        "RS-DOOR-LCK",
+        "RS-DOOR-MTR",
+        "RS-DOOR-STS"
+      ],
+      "hexagon_mapping": "HX-P-023"
+    },
+    {
+      "code_type": "problem_code",
+      "code": "ME-024",
+      "label": "VOBC Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car"
+      ],
+      "description": "Vehicle On-Board Controller halt, overspeed, or communication error",
+      "related_codes": [
+        "RS-VOBC-HLT",
+        "RS-VOBC-SPD"
+      ],
+      "hexagon_mapping": "HX-P-024"
+    },
+    {
+      "code_type": "problem_code",
+      "code": "ME-025",
+      "label": "Propulsion System Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car"
+      ],
+      "description": "Propulsion or traction system fault requiring PCU isolation or tag-out",
+      "related_codes": [
+        "RS-PROP-PCU"
+      ],
+      "hexagon_mapping": "HX-P-025"
+    },
+    {
+      "code_type": "problem_code",
+      "code": "ME-026",
+      "label": "Brake System Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "bogie"
+      ],
+      "description": "Brake application fault or unexpected emergency brake deployment",
+      "related_codes": [
+        "RS-BRK-FLT"
+      ],
+      "hexagon_mapping": "HX-P-026"
+    },
+    {
+      "code_type": "problem_code",
+      "code": "ME-027",
+      "label": "HVAC System Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "hvac_unit"
+      ],
+      "description": "Train HVAC (heating, ventilation, air conditioning) malfunction or alarm",
+      "related_codes": [
+        "RS-HVAC-FLT"
+      ],
+      "hexagon_mapping": "HX-P-027"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-DOOR-LCK",
+      "label": "Door Lock Assembly Failure",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "door_system"
+      ],
+      "description": "Door lock assembly not engaging; door cannot confirm locked state (EAM FC14)",
+      "related_codes": [
+        "ME-023"
+      ],
+      "hexagon_mapping": "HX-F-RS-DOOR-LCK"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-DOOR-MTR",
+      "label": "Door Motor Failure",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "door_system"
+      ],
+      "description": "Door motor failed; door will not open or close under power",
+      "related_codes": [
+        "ME-023"
+      ],
+      "hexagon_mapping": "HX-F-RS-DOOR-MTR"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-DOOR-STS",
+      "label": "Door Status Loss",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "door_system"
+      ],
+      "description": "Loss of door status feedback; system cannot confirm door state (EAM FC15)",
+      "related_codes": [
+        "ME-023"
+      ],
+      "hexagon_mapping": "HX-F-RS-DOOR-STS"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-VOBC-HLT",
+      "label": "VOBC Halt",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car"
+      ],
+      "description": "Vehicle On-Board Controller command halt; HMP BITE error triggers stop (EAM FC4)",
+      "related_codes": [
+        "ME-024"
+      ],
+      "hexagon_mapping": "HX-F-RS-VOBC-HLT"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-VOBC-SPD",
+      "label": "VOBC Overspeed Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car"
+      ],
+      "description": "VOBC detected train exceeding permitted speed profile; emergency brake applied",
+      "related_codes": [
+        "ME-024"
+      ],
+      "hexagon_mapping": "HX-F-RS-VOBC-SPD"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-PROP-PCU",
+      "label": "Propulsion PCU Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car"
+      ],
+      "description": "Propulsion Control Unit fault requiring tag-out; BITE error logged (EAM FC6)",
+      "related_codes": [
+        "ME-025"
+      ],
+      "hexagon_mapping": "HX-F-RS-PROP-PCU"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-BRK-FLT",
+      "label": "Brake System Fault",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "bogie"
+      ],
+      "description": "Unexpected brake application or brake fault alarm; may self-clear with reset (EAM FC2)",
+      "related_codes": [
+        "ME-026"
+      ],
+      "hexagon_mapping": "HX-F-RS-BRK-FLT"
+    },
+    {
+      "code_type": "fault_code",
+      "code": "RS-HVAC-FLT",
+      "label": "HVAC Alarm \u2014 No Clear",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "hvac_unit"
+      ],
+      "description": "HVAC fault alarm will not clear; under investigation",
+      "related_codes": [
+        "ME-027"
+      ],
+      "hexagon_mapping": "HX-F-RS-HVAC-FLT"
+    },
+    {
+      "code_type": "action_code",
+      "code": "RS-RPLC-LCK",
+      "label": "Replace Lock Assembly",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "door_system"
+      ],
+      "description": "Remove defective lock assembly and install replacement; cycle doors in manual and auto to verify",
+      "related_codes": [],
+      "hexagon_mapping": "HX-A-RS-RPLC-LCK"
+    },
+    {
+      "code_type": "action_code",
+      "code": "RS-RPLC-MTR",
+      "label": "Replace Door Motor",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "door_system"
+      ],
+      "description": "Change out door motor; test door operation after replacement",
+      "related_codes": [],
+      "hexagon_mapping": "HX-A-RS-RPLC-MTR"
+    },
+    {
+      "code_type": "action_code",
+      "code": "RS-RST-VOBC",
+      "label": "Reset VOBC",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car"
+      ],
+      "description": "Perform VOBC soft reset via HMP; clear BITE error log; confirm ATP re-acquisition",
+      "related_codes": [],
+      "hexagon_mapping": "HX-A-RS-RST-VOBC"
+    },
+    {
+      "code_type": "action_code",
+      "code": "RS-TGOUT-PCU",
+      "label": "Tag Out PCU",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car"
+      ],
+      "description": "Apply LOTO tag-out on Propulsion Control Unit; isolate propulsion car for investigation",
+      "related_codes": [],
+      "hexagon_mapping": "HX-A-RS-TGOUT-PCU"
+    },
+    {
+      "code_type": "action_code",
+      "code": "RS-RST-BRK",
+      "label": "Reset Brake System",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "bogie"
+      ],
+      "description": "Reset brake fault via brake controller; verify brake release and application cycle",
+      "related_codes": [],
+      "hexagon_mapping": "HX-A-RS-RST-BRK"
+    },
+    {
+      "code_type": "action_code",
+      "code": "RS-INV-HVAC",
+      "label": "Investigate HVAC",
+      "department": "rolling_stock",
+      "asset_types": [
+        "train_car",
+        "hvac_unit"
+      ],
+      "description": "Inspect HVAC unit for fault source; check compressor, condenser, control board",
+      "related_codes": [],
+      "hexagon_mapping": "HX-A-RS-INV-HVAC"
     }
   ],
   "assets": [
@@ -1360,330 +1725,6 @@
         "Track Bed #3"
       ],
       "last_inspection": "2025-11-03",
-      "status": "operational"
-    },
-    {
-      "asset_id": "TC-SC-001",
-      "name": "Stadium-Chinatown Train Car #1",
-      "type": "train_car",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Stadium-Chinatown",
-        "station_code": "SC",
-        "zone": "Zone 1",
-        "gps": {
-          "lat": 49.277441,
-          "lng": -122.932988
-        }
-      },
-      "equipment_code": "EQ-ROL-0019",
-      "manufacturer": "Hyundai Rotem",
-      "model": "Hyundai Rotem Mark IV",
-      "install_date": "2020-10-15",
-      "asset_hierarchy": [
-        "BCRTC-Zone1",
-        "Stadium-Chinatown",
-        "Rolling Stock",
-        "Train Car #1"
-      ],
-      "last_inspection": "2026-01-25",
-      "status": "degraded"
-    },
-    {
-      "asset_id": "TC-MT-002",
-      "name": "Metrotown Train Car #2",
-      "type": "train_car",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Metrotown",
-        "station_code": "MT",
-        "zone": "Zone 2",
-        "gps": {
-          "lat": 49.198477,
-          "lng": -122.872852
-        }
-      },
-      "equipment_code": "EQ-ROL-0020",
-      "manufacturer": "CAF",
-      "model": "CAF 2000",
-      "install_date": "2008-07-06",
-      "asset_hierarchy": [
-        "BCRTC-Zone2",
-        "Metrotown",
-        "Rolling Stock",
-        "Train Car #2"
-      ],
-      "last_inspection": "2026-01-23",
-      "status": "degraded"
-    },
-    {
-      "asset_id": "TC-MS-003",
-      "name": "Main Street-Science World Train Car #3",
-      "type": "train_car",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Main Street-Science World",
-        "station_code": "MS",
-        "zone": "Zone 1",
-        "gps": {
-          "lat": 49.249557,
-          "lng": -122.903645
-        }
-      },
-      "equipment_code": "EQ-ROL-0021",
-      "manufacturer": "Bombardier",
-      "model": "Bombardier Pro",
-      "install_date": "2013-08-11",
-      "asset_hierarchy": [
-        "BCRTC-Zone1",
-        "Main Street-Science World",
-        "Rolling Stock",
-        "Train Car #3"
-      ],
-      "last_inspection": "2026-01-21",
-      "status": "out_of_service"
-    },
-    {
-      "asset_id": "BOG-SU-001",
-      "name": "Surrey Central Bogie #1",
-      "type": "bogie",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Surrey Central",
-        "station_code": "SU",
-        "zone": "Zone 3",
-        "gps": {
-          "lat": 49.239508,
-          "lng": -123.048003
-        }
-      },
-      "equipment_code": "EQ-ROL-0022",
-      "manufacturer": "Bombardier",
-      "model": "Bombardier Elite",
-      "install_date": "2002-09-26",
-      "asset_hierarchy": [
-        "BCRTC-Zone3",
-        "Surrey Central",
-        "Rolling Stock",
-        "Bogie #1"
-      ],
-      "last_inspection": "2026-02-12",
-      "status": "operational"
-    },
-    {
-      "asset_id": "BOG-JC-002",
-      "name": "Joyce-Collingwood Bogie #2",
-      "type": "bogie",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Joyce-Collingwood",
-        "station_code": "JC",
-        "zone": "Zone 2",
-        "gps": {
-          "lat": 49.281051,
-          "lng": -122.854077
-        }
-      },
-      "equipment_code": "EQ-ROL-0023",
-      "manufacturer": "CAF",
-      "model": "CAF Elite",
-      "install_date": "2010-05-18",
-      "asset_hierarchy": [
-        "BCRTC-Zone2",
-        "Joyce-Collingwood",
-        "Rolling Stock",
-        "Bogie #2"
-      ],
-      "last_inspection": "2025-11-27",
-      "status": "degraded"
-    },
-    {
-      "asset_id": "BOG-ED-003",
-      "name": "Edmonds Bogie #3",
-      "type": "bogie",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Edmonds",
-        "station_code": "ED",
-        "zone": "Zone 2",
-        "gps": {
-          "lat": 49.220656,
-          "lng": -122.888444
-        }
-      },
-      "equipment_code": "EQ-ROL-0024",
-      "manufacturer": "Bombardier",
-      "model": "Bombardier 2000",
-      "install_date": "2011-09-17",
-      "asset_hierarchy": [
-        "BCRTC-Zone2",
-        "Edmonds",
-        "Rolling Stock",
-        "Bogie #3"
-      ],
-      "last_inspection": "2025-09-12",
-      "status": "operational"
-    },
-    {
-      "asset_id": "DOR-BU-001",
-      "name": "Burrard Door System #1",
-      "type": "door_system",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Burrard",
-        "station_code": "BU",
-        "zone": "Zone 1",
-        "gps": {
-          "lat": 49.306152,
-          "lng": -122.996526
-        }
-      },
-      "equipment_code": "EQ-ROL-0025",
-      "manufacturer": "CAF",
-      "model": "CAF Mark IV",
-      "install_date": "2002-07-13",
-      "asset_hierarchy": [
-        "BCRTC-Zone1",
-        "Burrard",
-        "Rolling Stock",
-        "Door System #1"
-      ],
-      "last_inspection": "2025-12-21",
-      "status": "operational"
-    },
-    {
-      "asset_id": "DOR-JC-002",
-      "name": "Joyce-Collingwood Door System #2",
-      "type": "door_system",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Joyce-Collingwood",
-        "station_code": "JC",
-        "zone": "Zone 2",
-        "gps": {
-          "lat": 49.201576,
-          "lng": -122.975699
-        }
-      },
-      "equipment_code": "EQ-ROL-0026",
-      "manufacturer": "CAF",
-      "model": "CAF 2000",
-      "install_date": "2010-09-08",
-      "asset_hierarchy": [
-        "BCRTC-Zone2",
-        "Joyce-Collingwood",
-        "Rolling Stock",
-        "Door System #2"
-      ],
-      "last_inspection": "2025-09-17",
-      "status": "operational"
-    },
-    {
-      "asset_id": "DOR-PW-003",
-      "name": "Production Way-University Door System #3",
-      "type": "door_system",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Production Way-University",
-        "station_code": "PW",
-        "zone": "Zone 2",
-        "gps": {
-          "lat": 49.261446,
-          "lng": -122.973163
-        }
-      },
-      "equipment_code": "EQ-ROL-0027",
-      "manufacturer": "CAF",
-      "model": "CAF 2000",
-      "install_date": "2022-07-14",
-      "asset_hierarchy": [
-        "BCRTC-Zone2",
-        "Production Way-University",
-        "Rolling Stock",
-        "Door System #3"
-      ],
-      "last_inspection": "2025-10-06",
-      "status": "operational"
-    },
-    {
-      "asset_id": "HVT-ED-001",
-      "name": "Edmonds Hvac Unit #1",
-      "type": "hvac_unit",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Edmonds",
-        "station_code": "ED",
-        "zone": "Zone 2",
-        "gps": {
-          "lat": 49.277226,
-          "lng": -122.931988
-        }
-      },
-      "equipment_code": "EQ-ROL-0028",
-      "manufacturer": "CAF",
-      "model": "CAF Elite",
-      "install_date": "2003-11-17",
-      "asset_hierarchy": [
-        "BCRTC-Zone2",
-        "Edmonds",
-        "Rolling Stock",
-        "Hvac Unit #1"
-      ],
-      "last_inspection": "2025-10-10",
-      "status": "operational"
-    },
-    {
-      "asset_id": "HVT-GW-002",
-      "name": "Gateway Hvac Unit #2",
-      "type": "hvac_unit",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Gateway",
-        "station_code": "GW",
-        "zone": "Zone 3",
-        "gps": {
-          "lat": 49.242897,
-          "lng": -123.017821
-        }
-      },
-      "equipment_code": "EQ-ROL-0029",
-      "manufacturer": "CAF",
-      "model": "CAF X200",
-      "install_date": "2009-07-09",
-      "asset_hierarchy": [
-        "BCRTC-Zone3",
-        "Gateway",
-        "Rolling Stock",
-        "Hvac Unit #2"
-      ],
-      "last_inspection": "2025-12-23",
-      "status": "operational"
-    },
-    {
-      "asset_id": "HVT-MS-003",
-      "name": "Main Street-Science World Hvac Unit #3",
-      "type": "hvac_unit",
-      "department": "rolling_stock",
-      "location": {
-        "station": "Main Street-Science World",
-        "station_code": "MS",
-        "zone": "Zone 1",
-        "gps": {
-          "lat": 49.243207,
-          "lng": -122.955993
-        }
-      },
-      "equipment_code": "EQ-ROL-0030",
-      "manufacturer": "Bombardier",
-      "model": "Bombardier S-Type",
-      "install_date": "2013-10-12",
-      "asset_hierarchy": [
-        "BCRTC-Zone1",
-        "Main Street-Science World",
-        "Rolling Stock",
-        "Hvac Unit #3"
-      ],
-      "last_inspection": "2025-12-10",
       "status": "operational"
     },
     {
@@ -2657,29 +2698,2156 @@
       ],
       "last_inspection": "2025-09-29",
       "status": "operational"
+    },
+    {
+      "asset_id": "ESC-SC-003",
+      "name": "Stadium-Chinatown Escalator #3",
+      "type": "escalator",
+      "department": "elevating_devices",
+      "location": {
+        "station": "Stadium-Chinatown",
+        "station_code": "SC",
+        "zone": "Zone 1",
+        "gps": {
+          "lat": 49.279523,
+          "lng": -123.109547
+        }
+      },
+      "equipment_code": "EQ-ELE-0067",
+      "manufacturer": "KONE",
+      "model": "KONE TransitMaster 140",
+      "install_date": "2016-09-15",
+      "asset_hierarchy": [
+        "BCRTC-Zone1",
+        "Stadium-Chinatown",
+        "Elevating Devices",
+        "Escalator #3"
+      ],
+      "last_inspection": "2026-02-20",
+      "status": "degraded"
+    },
+    {
+      "asset_id": "TC-036",
+      "name": "Train Car #36 (MK I 100/200)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-36",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I",
+      "install_date": "1986-01-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (100/200 Series)",
+        "Train Car #36"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 100/200",
+      "vehicle_number": 36
+    },
+    {
+      "asset_id": "TC-036-D1",
+      "name": "Train Car #36 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D36-1",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1986-01-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (100/200 Series)",
+        "Train Car #36",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 100/200",
+      "vehicle_number": 36,
+      "parent_asset_id": "TC-036",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-036-D2",
+      "name": "Train Car #36 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D36-2",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1986-01-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (100/200 Series)",
+        "Train Car #36",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 100/200",
+      "vehicle_number": 36,
+      "parent_asset_id": "TC-036",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-036-D3",
+      "name": "Train Car #36 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D36-3",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1986-01-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (100/200 Series)",
+        "Train Car #36",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 100/200",
+      "vehicle_number": 36,
+      "parent_asset_id": "TC-036",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-036-D4",
+      "name": "Train Car #36 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D36-4",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1986-01-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (100/200 Series)",
+        "Train Car #36",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 100/200",
+      "vehicle_number": 36,
+      "parent_asset_id": "TC-036",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-036-VOBC",
+      "name": "Train Car #36 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V36",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "1986-01-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (100/200 Series)",
+        "Train Car #36",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK I 100/200",
+      "vehicle_number": 36,
+      "parent_asset_id": "TC-036"
+    },
+    {
+      "asset_id": "TC-036-PROP",
+      "name": "Train Car #36 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P36",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "1986-01-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (100/200 Series)",
+        "Train Car #36",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK I 100/200",
+      "vehicle_number": 36,
+      "parent_asset_id": "TC-036"
+    },
+    {
+      "asset_id": "TC-138",
+      "name": "Train Car #138 (MK I 700/800)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-138",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I",
+      "install_date": "1994-03-10",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #138"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "out_of_service",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 138
+    },
+    {
+      "asset_id": "TC-138-D1",
+      "name": "Train Car #138 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D138-1",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-03-10",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #138",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 138,
+      "parent_asset_id": "TC-138",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-138-D2",
+      "name": "Train Car #138 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D138-2",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-03-10",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #138",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 138,
+      "parent_asset_id": "TC-138",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-138-D3",
+      "name": "Train Car #138 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D138-3",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-03-10",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #138",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 138,
+      "parent_asset_id": "TC-138",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-138-D4",
+      "name": "Train Car #138 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D138-4",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-03-10",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #138",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 138,
+      "parent_asset_id": "TC-138",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-138-VOBC",
+      "name": "Train Car #138 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V138",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "1994-03-10",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #138",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 138,
+      "parent_asset_id": "TC-138"
+    },
+    {
+      "asset_id": "TC-138-PROP",
+      "name": "Train Car #138 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P138",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "1994-03-10",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #138",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "out_of_service",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 138,
+      "parent_asset_id": "TC-138"
+    },
+    {
+      "asset_id": "TC-139",
+      "name": "Train Car #139 (MK I 700/800)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-139",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I",
+      "install_date": "1994-05-22",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #139"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 139
+    },
+    {
+      "asset_id": "TC-139-D1",
+      "name": "Train Car #139 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D139-1",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-05-22",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #139",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 139,
+      "parent_asset_id": "TC-139",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-139-D2",
+      "name": "Train Car #139 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D139-2",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-05-22",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #139",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 139,
+      "parent_asset_id": "TC-139",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-139-D3",
+      "name": "Train Car #139 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D139-3",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-05-22",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #139",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 139,
+      "parent_asset_id": "TC-139",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-139-D4",
+      "name": "Train Car #139 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D139-4",
+      "manufacturer": "Bombardier Transportation (UTDC)",
+      "model": "UTDC/Bombardier Mark I \u2014 Door Assembly",
+      "install_date": "1994-05-22",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #139",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 139,
+      "parent_asset_id": "TC-139",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-139-VOBC",
+      "name": "Train Car #139 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V139",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "1994-05-22",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #139",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 139,
+      "parent_asset_id": "TC-139"
+    },
+    {
+      "asset_id": "TC-139-PROP",
+      "name": "Train Car #139 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P139",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "1994-05-22",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK I Fleet (700/800 Series)",
+        "Train Car #139",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK I 700/800",
+      "vehicle_number": 139,
+      "parent_asset_id": "TC-139"
+    },
+    {
+      "asset_id": "TC-205",
+      "name": "Train Car #205 (MK II 1100/1200)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-205",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II",
+      "install_date": "2002-08-15",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #205"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 205
+    },
+    {
+      "asset_id": "TC-205-D1",
+      "name": "Train Car #205 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D205-1",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-08-15",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #205",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 205,
+      "parent_asset_id": "TC-205",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-205-D2",
+      "name": "Train Car #205 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D205-2",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-08-15",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #205",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 205,
+      "parent_asset_id": "TC-205",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-205-D3",
+      "name": "Train Car #205 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D205-3",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-08-15",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #205",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 205,
+      "parent_asset_id": "TC-205",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-205-D4",
+      "name": "Train Car #205 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D205-4",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-08-15",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #205",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 205,
+      "parent_asset_id": "TC-205",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-205-VOBC",
+      "name": "Train Car #205 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V205",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "2002-08-15",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #205",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 205,
+      "parent_asset_id": "TC-205"
+    },
+    {
+      "asset_id": "TC-205-PROP",
+      "name": "Train Car #205 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P205",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "2002-08-15",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #205",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 205,
+      "parent_asset_id": "TC-205"
+    },
+    {
+      "asset_id": "TC-212",
+      "name": "Train Car #212 (MK II 1100/1200)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-212",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II",
+      "install_date": "2002-11-30",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #212"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "out_of_service",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 212
+    },
+    {
+      "asset_id": "TC-212-D1",
+      "name": "Train Car #212 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D212-1",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-11-30",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #212",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 212,
+      "parent_asset_id": "TC-212",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-212-D2",
+      "name": "Train Car #212 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D212-2",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-11-30",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #212",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 212,
+      "parent_asset_id": "TC-212",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-212-D3",
+      "name": "Train Car #212 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D212-3",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-11-30",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #212",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 212,
+      "parent_asset_id": "TC-212",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-212-D4",
+      "name": "Train Car #212 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D212-4",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2002-11-30",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #212",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 212,
+      "parent_asset_id": "TC-212",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-212-VOBC",
+      "name": "Train Car #212 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V212",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "2002-11-30",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #212",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "out_of_service",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 212,
+      "parent_asset_id": "TC-212"
+    },
+    {
+      "asset_id": "TC-212-PROP",
+      "name": "Train Car #212 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P212",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "2002-11-30",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #212",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 212,
+      "parent_asset_id": "TC-212"
+    },
+    {
+      "asset_id": "TC-229",
+      "name": "Train Car #229 (MK II 1100/1200)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-229",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II",
+      "install_date": "2003-02-14",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #229"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 229
+    },
+    {
+      "asset_id": "TC-229-D1",
+      "name": "Train Car #229 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D229-1",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2003-02-14",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #229",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 229,
+      "parent_asset_id": "TC-229",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-229-D2",
+      "name": "Train Car #229 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D229-2",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2003-02-14",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #229",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 229,
+      "parent_asset_id": "TC-229",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-229-D3",
+      "name": "Train Car #229 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D229-3",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2003-02-14",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #229",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 229,
+      "parent_asset_id": "TC-229",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-229-D4",
+      "name": "Train Car #229 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D229-4",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2003-02-14",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #229",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 229,
+      "parent_asset_id": "TC-229",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-229-VOBC",
+      "name": "Train Car #229 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V229",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "2003-02-14",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #229",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 229,
+      "parent_asset_id": "TC-229"
+    },
+    {
+      "asset_id": "TC-229-PROP",
+      "name": "Train Car #229 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P229",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "2003-02-14",
+      "asset_hierarchy": [
+        "BCRTC-MillenniumLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #229",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 229,
+      "parent_asset_id": "TC-229"
+    },
+    {
+      "asset_id": "TC-258",
+      "name": "Train Car #258 (MK II 1100/1200)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-258",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II",
+      "install_date": "2004-06-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #258"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 258
+    },
+    {
+      "asset_id": "TC-258-D1",
+      "name": "Train Car #258 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D258-1",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2004-06-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #258",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 258,
+      "parent_asset_id": "TC-258",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-258-D2",
+      "name": "Train Car #258 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D258-2",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2004-06-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #258",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 258,
+      "parent_asset_id": "TC-258",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-258-D3",
+      "name": "Train Car #258 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D258-3",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2004-06-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #258",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 258,
+      "parent_asset_id": "TC-258",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-258-D4",
+      "name": "Train Car #258 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D258-4",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2004-06-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #258",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 258,
+      "parent_asset_id": "TC-258",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-258-VOBC",
+      "name": "Train Car #258 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V258",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "2004-06-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #258",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 258,
+      "parent_asset_id": "TC-258"
+    },
+    {
+      "asset_id": "TC-258-PROP",
+      "name": "Train Car #258 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P258",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "2004-06-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #258",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 258,
+      "parent_asset_id": "TC-258"
+    },
+    {
+      "asset_id": "TC-332",
+      "name": "Train Car #332 (MK II 1100/1200)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-332",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II",
+      "install_date": "2005-09-20",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #332"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 332
+    },
+    {
+      "asset_id": "TC-332-D1",
+      "name": "Train Car #332 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D332-1",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2005-09-20",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #332",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 332,
+      "parent_asset_id": "TC-332",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-332-D2",
+      "name": "Train Car #332 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D332-2",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2005-09-20",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #332",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 332,
+      "parent_asset_id": "TC-332",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-332-D3",
+      "name": "Train Car #332 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D332-3",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2005-09-20",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #332",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 332,
+      "parent_asset_id": "TC-332",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-332-D4",
+      "name": "Train Car #332 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D332-4",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark II \u2014 Door Assembly",
+      "install_date": "2005-09-20",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #332",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 332,
+      "parent_asset_id": "TC-332",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-332-VOBC",
+      "name": "Train Car #332 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V332",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "2005-09-20",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #332",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "degraded",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 332,
+      "parent_asset_id": "TC-332"
+    },
+    {
+      "asset_id": "TC-332-PROP",
+      "name": "Train Car #332 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P332",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "2005-09-20",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK II Fleet (1100/1200 Series)",
+        "Train Car #332",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK II 1100/1200",
+      "vehicle_number": 332,
+      "parent_asset_id": "TC-332"
+    },
+    {
+      "asset_id": "TC-438",
+      "name": "Train Car #438 (MK III 2500/2800)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-438",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III",
+      "install_date": "2009-11-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #438"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "degraded",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 438
+    },
+    {
+      "asset_id": "TC-438-D1",
+      "name": "Train Car #438 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D438-1",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2009-11-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #438",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 438,
+      "parent_asset_id": "TC-438",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-438-D2",
+      "name": "Train Car #438 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D438-2",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2009-11-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #438",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 438,
+      "parent_asset_id": "TC-438",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-438-D3",
+      "name": "Train Car #438 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D438-3",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2009-11-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #438",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 438,
+      "parent_asset_id": "TC-438",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-438-D4",
+      "name": "Train Car #438 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D438-4",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2009-11-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #438",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 438,
+      "parent_asset_id": "TC-438",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-438-VOBC",
+      "name": "Train Car #438 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V438",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "2009-11-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #438",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 438,
+      "parent_asset_id": "TC-438"
+    },
+    {
+      "asset_id": "TC-438-PROP",
+      "name": "Train Car #438 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P438",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "2009-11-01",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #438",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 438,
+      "parent_asset_id": "TC-438"
+    },
+    {
+      "asset_id": "TC-480",
+      "name": "Train Car #480 (MK III 2500/2800)",
+      "type": "train_car",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-TC-480",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III",
+      "install_date": "2010-04-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #480"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 480
+    },
+    {
+      "asset_id": "TC-480-D1",
+      "name": "Train Car #480 \u2014 Door D1",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D480-1",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2010-04-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #480",
+        "Door D1"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 480,
+      "parent_asset_id": "TC-480",
+      "door_position": "D1"
+    },
+    {
+      "asset_id": "TC-480-D2",
+      "name": "Train Car #480 \u2014 Door D2",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D480-2",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2010-04-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #480",
+        "Door D2"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 480,
+      "parent_asset_id": "TC-480",
+      "door_position": "D2"
+    },
+    {
+      "asset_id": "TC-480-D3",
+      "name": "Train Car #480 \u2014 Door D3",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D480-3",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2010-04-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #480",
+        "Door D3"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 480,
+      "parent_asset_id": "TC-480",
+      "door_position": "D3"
+    },
+    {
+      "asset_id": "TC-480-D4",
+      "name": "Train Car #480 \u2014 Door D4",
+      "type": "door",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-D480-4",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Innovia Metro 300 Mark III \u2014 Door Assembly",
+      "install_date": "2010-04-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #480",
+        "Door D4"
+      ],
+      "last_inspection": "2026-02-15",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 480,
+      "parent_asset_id": "TC-480",
+      "door_position": "D4"
+    },
+    {
+      "asset_id": "TC-480-VOBC",
+      "name": "Train Car #480 \u2014 VOBC",
+      "type": "vobc",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-V480",
+      "manufacturer": "Alcatel (Thales)",
+      "model": "Thales SelTrac VOBC",
+      "install_date": "2010-04-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #480",
+        "VOBC"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 480,
+      "parent_asset_id": "TC-480"
+    },
+    {
+      "asset_id": "TC-480-PROP",
+      "name": "Train Car #480 \u2014 Propulsion PCU",
+      "type": "propulsion",
+      "department": "rolling_stock",
+      "location": {
+        "station": "Operations & Maintenance Centre",
+        "station_code": "OMC",
+        "zone": "Zone 0",
+        "gps": {
+          "lat": 49.1992,
+          "lng": -122.8827
+        }
+      },
+      "equipment_code": "EQ-ROL-P480",
+      "manufacturer": "Bombardier Transportation",
+      "model": "Bombardier Linear Induction Motor PCU",
+      "install_date": "2010-04-15",
+      "asset_hierarchy": [
+        "BCRTC-ExpoLine",
+        "MK III Fleet (2500/2800 Series)",
+        "Train Car #480",
+        "Propulsion PCU"
+      ],
+      "last_inspection": "2026-01-20",
+      "status": "operational",
+      "fleet": "MK III 2500/2800",
+      "vehicle_number": 480,
+      "parent_asset_id": "TC-480"
     }
   ],
   "work_orders": [
-    {
-      "wo_id": "WO-2025-0001",
-      "asset_id": "HVT-GW-002",
-      "status": "open",
-      "priority": "P3",
-      "problem_code": "ME-020",
-      "fault_code": "MECH-BRK",
-      "action_code": "LUBRICATE",
-      "failure_class": "MECHANICAL",
-      "description": "Found broken component on Gateway Hvac Unit #2",
-      "created_by": "D. Lee",
-      "created_at": "2025-08-16T03:47:43.806290",
-      "assigned_to": "D. Lee",
-      "photos": [],
-      "ai_confidence": 0.82,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-08-16"
-      ]
-    },
     {
       "wo_id": "WO-2025-0002",
       "asset_id": "RAD-RO-001",
@@ -2718,26 +4886,6 @@
       "technician_confirmed": true,
       "notes": [
         "Created during inspection on 2025-05-12"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0004",
-      "asset_id": "HVT-MS-003",
-      "status": "completed",
-      "priority": "P4",
-      "problem_code": "ME-017",
-      "fault_code": "CRACK-STR",
-      "action_code": "UPGRADE",
-      "failure_class": "STRUCTURAL",
-      "description": "Found stress crack on Main Street-Science World Hvac Unit #3",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-05-05T03:47:43.806358",
-      "assigned_to": "K. Williams",
-      "photos": [],
-      "ai_confidence": 0.83,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-05-05"
       ]
     },
     {
@@ -2821,26 +4969,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0009",
-      "asset_id": "TC-MT-002",
-      "status": "cancelled",
-      "priority": "P1",
-      "problem_code": "ME-004",
-      "fault_code": "MECH-MIS",
-      "action_code": "LUBRICATE",
-      "failure_class": "STRUCTURAL",
-      "description": "Technician reported misalignment \u2014 action required",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-10-11T03:47:43.806424",
-      "assigned_to": "S. Martinez",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-10-11"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0010",
       "asset_id": "TRF-LO-003",
       "status": "in_progress",
@@ -2881,26 +5009,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0012",
-      "asset_id": "HVT-ED-001",
-      "status": "cancelled",
-      "priority": "P1",
-      "problem_code": "ME-011",
-      "fault_code": "MECH-MIS",
-      "action_code": "UPGRADE",
-      "failure_class": "STRUCTURAL",
-      "description": "Found misalignment on Edmonds Hvac Unit #1",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-11-26T03:47:43.806464",
-      "assigned_to": "R. Patel",
-      "photos": [],
-      "ai_confidence": 0.88,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-11-26"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0013",
       "asset_id": "SWM-LC-003",
       "status": "open",
@@ -2938,46 +5046,6 @@
       "technician_confirmed": true,
       "notes": [
         "Created during inspection on 2025-12-20"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0015",
-      "asset_id": "HVT-ED-001",
-      "status": "completed",
-      "priority": "P5",
-      "problem_code": "ME-020",
-      "fault_code": "WEAR-FAT",
-      "action_code": "PAINT",
-      "failure_class": "STRUCTURAL",
-      "description": "Hvac Unit showing signs of ventilation issue",
-      "created_by": "T. Brown",
-      "created_at": "2025-11-20T03:47:43.806502",
-      "assigned_to": "T. Brown",
-      "photos": [],
-      "ai_confidence": 0.84,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-11-20"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0016",
-      "asset_id": "HVT-MS-003",
-      "status": "open",
-      "priority": "P2",
-      "problem_code": "ME-011",
-      "fault_code": "WEAR-FAT",
-      "action_code": "PAINT",
-      "failure_class": "ELECTRICAL",
-      "description": "Temperature Anomaly detected during routine inspection",
-      "created_by": "J. Chen",
-      "created_at": "2025-03-27T03:47:43.806513",
-      "assigned_to": "J. Chen",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-03-27"
       ]
     },
     {
@@ -3118,46 +5186,6 @@
       "technician_confirmed": false,
       "notes": [
         "Created during inspection on 2025-10-11"
-      ]
-    },
-    {
-      "wo_id": "WO-2026-0024",
-      "asset_id": "DOR-BU-001",
-      "status": "in_progress",
-      "priority": "P3",
-      "problem_code": "ME-005",
-      "fault_code": "MECH-MIS",
-      "action_code": "UPGRADE",
-      "failure_class": "MECHANICAL",
-      "description": "Found misalignment on Burrard Door System #1",
-      "created_by": "J. Chen",
-      "created_at": "2026-01-26T03:47:43.806643",
-      "assigned_to": "J. Chen",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2026-01-26"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0025",
-      "asset_id": "TC-MS-003",
-      "status": "open",
-      "priority": "P3",
-      "problem_code": "ME-018",
-      "fault_code": "MECH-MIS",
-      "action_code": "UPGRADE",
-      "failure_class": "ENVIRONMENTAL",
-      "description": "Found misalignment on Main Street-Science World Train Car #3",
-      "created_by": "T. Brown",
-      "created_at": "2025-06-15T03:47:43.806655",
-      "assigned_to": "T. Brown",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-06-15"
       ]
     },
     {
@@ -3341,26 +5369,6 @@
       ]
     },
     {
-      "wo_id": "WO-2026-0035",
-      "asset_id": "HVT-GW-002",
-      "status": "open",
-      "priority": "P4",
-      "problem_code": "ME-011",
-      "fault_code": "HYD-LK",
-      "action_code": "LUBRICATE",
-      "failure_class": "MECHANICAL",
-      "description": "Technician reported hydraulic leak \u2014 action required",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2026-02-11T03:47:43.806777",
-      "assigned_to": "M. Singh",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2026-02-11"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0036",
       "asset_id": "LIT-SC-001",
       "status": "open",
@@ -3418,26 +5426,6 @@
       "technician_confirmed": true,
       "notes": [
         "Created during inspection on 2025-03-09"
-      ]
-    },
-    {
-      "wo_id": "WO-2026-0039",
-      "asset_id": "TC-MT-002",
-      "status": "completed",
-      "priority": "P4",
-      "problem_code": "ME-013",
-      "fault_code": "MECH-MIS",
-      "action_code": "LUBRICATE",
-      "failure_class": "ELECTRICAL",
-      "description": "Technician reported misalignment \u2014 action required",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2026-02-09T03:47:43.806826",
-      "assigned_to": "M. Singh",
-      "photos": [],
-      "ai_confidence": 0.72,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2026-02-09"
       ]
     },
     {
@@ -3541,46 +5529,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0045",
-      "asset_id": "HVT-MS-003",
-      "status": "open",
-      "priority": "P3",
-      "problem_code": "ME-020",
-      "fault_code": "CRACK-THR",
-      "action_code": "LUBRICATE",
-      "failure_class": "STRUCTURAL",
-      "description": "Ventilation Issue detected during routine inspection",
-      "created_by": "R. Patel",
-      "created_at": "2025-07-31T03:47:43.806907",
-      "assigned_to": "R. Patel",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-07-31"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0046",
-      "asset_id": "HVT-GW-002",
-      "status": "completed",
-      "priority": "P2",
-      "problem_code": "ME-011",
-      "fault_code": "COR-GAL",
-      "action_code": "LUBRICATE",
-      "failure_class": "STRUCTURAL",
-      "description": "Hvac Unit showing signs of temperature anomaly",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-12-17T03:47:43.806924",
-      "assigned_to": "R. Patel",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-12-17"
-      ]
-    },
-    {
       "wo_id": "WO-2026-0047",
       "asset_id": "RAL-LO-003",
       "status": "on_hold",
@@ -3598,26 +5546,6 @@
       "technician_confirmed": false,
       "notes": [
         "Created during inspection on 2026-01-02"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0048",
-      "asset_id": "BOG-SU-001",
-      "status": "open",
-      "priority": "P3",
-      "problem_code": "ME-008",
-      "fault_code": "CRACK-THR",
-      "action_code": "PAINT",
-      "failure_class": "MECHANICAL",
-      "description": "Bogie showing signs of noise/vibration",
-      "created_by": "K. Williams",
-      "created_at": "2025-10-23T03:47:43.806955",
-      "assigned_to": "K. Williams",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-10-23"
       ]
     },
     {
@@ -3721,26 +5649,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0054",
-      "asset_id": "BOG-SU-001",
-      "status": "open",
-      "priority": "P4",
-      "problem_code": "ME-008",
-      "fault_code": "MECH-MIS",
-      "action_code": "UPGRADE",
-      "failure_class": "MECHANICAL",
-      "description": "Technician reported misalignment \u2014 action required",
-      "created_by": "A. Thompson",
-      "created_at": "2025-04-11T03:47:43.807029",
-      "assigned_to": "A. Thompson",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-04-11"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0055",
       "asset_id": "HVS-SU-001",
       "status": "completed",
@@ -3781,26 +5689,6 @@
       ]
     },
     {
-      "wo_id": "WO-2026-0057",
-      "asset_id": "HVT-MS-003",
-      "status": "completed",
-      "priority": "P3",
-      "problem_code": "ME-017",
-      "fault_code": "COR-GAL",
-      "action_code": "LUBRICATE",
-      "failure_class": "STRUCTURAL",
-      "description": "Technician reported galvanic corrosion \u2014 action required",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2026-02-03T03:47:43.807064",
-      "assigned_to": "T. Brown",
-      "photos": [],
-      "ai_confidence": 0.71,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2026-02-03"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0058",
       "asset_id": "TRK-PA-003",
       "status": "completed",
@@ -3818,26 +5706,6 @@
       "technician_confirmed": true,
       "notes": [
         "Created during inspection on 2025-04-28"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0059",
-      "asset_id": "DOR-PW-003",
-      "status": "on_hold",
-      "priority": "P3",
-      "problem_code": "ME-008",
-      "fault_code": "CRACK-STR",
-      "action_code": "LUBRICATE",
-      "failure_class": "STRUCTURAL",
-      "description": "Door System showing signs of noise/vibration",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-07-19T03:47:43.807100",
-      "assigned_to": "J. Chen",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-07-19"
       ]
     },
     {
@@ -3918,26 +5786,6 @@
       "technician_confirmed": true,
       "notes": [
         "Created during inspection on 2025-10-13"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0064",
-      "asset_id": "HVT-MS-003",
-      "status": "in_progress",
-      "priority": "P3",
-      "problem_code": "ME-020",
-      "fault_code": "CRACK-THR",
-      "action_code": "PAINT",
-      "failure_class": "MECHANICAL",
-      "description": "Ventilation Issue detected during routine inspection",
-      "created_by": "T. Brown",
-      "created_at": "2025-11-26T03:47:43.807240",
-      "assigned_to": "T. Brown",
-      "photos": [],
-      "ai_confidence": 0.9,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-11-26"
       ]
     },
     {
@@ -4041,26 +5889,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0070",
-      "asset_id": "BOG-JC-002",
-      "status": "completed",
-      "priority": "P4",
-      "problem_code": "ME-008",
-      "fault_code": "COR-CRV",
-      "action_code": "PAINT",
-      "failure_class": "MECHANICAL",
-      "description": "Technician reported crevice corrosion \u2014 action required",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-05-27T03:47:43.807354",
-      "assigned_to": "M. Singh",
-      "photos": [],
-      "ai_confidence": 0.79,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-05-27"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0071",
       "asset_id": "TRF-LO-003",
       "status": "completed",
@@ -4118,26 +5946,6 @@
       "technician_confirmed": true,
       "notes": [
         "Created during inspection on 2025-10-12"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0074",
-      "asset_id": "HVT-MS-003",
-      "status": "completed",
-      "priority": "P3",
-      "problem_code": "ME-020",
-      "fault_code": "ELEC-SHT",
-      "action_code": "UPGRADE",
-      "failure_class": "MECHANICAL",
-      "description": "Found short circuit on Main Street-Science World Hvac Unit #3",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-06-01T03:47:43.807420",
-      "assigned_to": "K. Williams",
-      "photos": [],
-      "ai_confidence": 0.0,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-06-01"
       ]
     },
     {
@@ -4641,26 +6449,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0100",
-      "asset_id": "HVT-MS-003",
-      "status": "completed",
-      "priority": "P4",
-      "problem_code": "ME-017",
-      "fault_code": "MECH-JAM",
-      "action_code": "PAINT",
-      "failure_class": "ENVIRONMENTAL",
-      "description": "Found jammed mechanism on Main Street-Science World Hvac Unit #3",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-07-12T03:47:43.807830",
-      "assigned_to": "R. Patel",
-      "photos": [],
-      "ai_confidence": 0.73,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-07-12"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0101",
       "asset_id": "ELV-SU-002",
       "status": "open",
@@ -4678,26 +6466,6 @@
       "technician_confirmed": false,
       "notes": [
         "Created during inspection on 2025-05-25"
-      ]
-    },
-    {
-      "wo_id": "WO-2025-0102",
-      "asset_id": "HVT-MS-003",
-      "status": "completed",
-      "priority": "P5",
-      "problem_code": "ME-017",
-      "fault_code": "WEAR-SUR",
-      "action_code": "UPGRADE",
-      "failure_class": "ELECTRICAL",
-      "description": "Found surface wear on Main Street-Science World Hvac Unit #3",
-      "created_by": "K. Williams",
-      "created_at": "2025-09-17T03:47:43.807853",
-      "assigned_to": "K. Williams",
-      "photos": [],
-      "ai_confidence": 0.8,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-09-17"
       ]
     },
     {
@@ -5018,26 +6786,6 @@
       "technician_confirmed": false,
       "notes": [
         "Created during inspection on 2025-06-01"
-      ]
-    },
-    {
-      "wo_id": "WO-2026-0119",
-      "asset_id": "HVT-MS-003",
-      "status": "completed",
-      "priority": "P5",
-      "problem_code": "ME-011",
-      "fault_code": "WEAR-ERO",
-      "action_code": "PAINT",
-      "failure_class": "MECHANICAL",
-      "description": "Technician reported erosion wear \u2014 action required",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2026-01-14T03:47:43.808113",
-      "assigned_to": "A. Thompson",
-      "photos": [],
-      "ai_confidence": 0.76,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2026-01-14"
       ]
     },
     {
@@ -5401,26 +7149,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0138",
-      "asset_id": "BOG-ED-003",
-      "status": "open",
-      "priority": "P4",
-      "problem_code": "ME-008",
-      "fault_code": "COR-CRV",
-      "action_code": "UPGRADE",
-      "failure_class": "STRUCTURAL",
-      "description": "Noise/Vibration detected during routine inspection",
-      "created_by": "J. Chen",
-      "created_at": "2025-04-17T03:47:43.808403",
-      "assigned_to": "J. Chen",
-      "photos": [],
-      "ai_confidence": 0.68,
-      "technician_confirmed": false,
-      "notes": [
-        "Created during inspection on 2025-04-17"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0139",
       "asset_id": "ESC-MT-003",
       "status": "on_hold",
@@ -5561,26 +7289,6 @@
       ]
     },
     {
-      "wo_id": "WO-2025-0146",
-      "asset_id": "TC-MT-002",
-      "status": "completed",
-      "priority": "P3",
-      "problem_code": "ME-014",
-      "fault_code": "MECH-MIS",
-      "action_code": "UPGRADE",
-      "failure_class": "ELECTRICAL",
-      "description": "Insulation Failure detected during routine inspection",
-      "created_by": "maintenance-eye-agent",
-      "created_at": "2025-10-24T03:47:43.808537",
-      "assigned_to": "M. Singh",
-      "photos": [],
-      "ai_confidence": 0.8,
-      "technician_confirmed": true,
-      "notes": [
-        "Created during inspection on 2025-10-24"
-      ]
-    },
-    {
       "wo_id": "WO-2025-0147",
       "asset_id": "RAL-LO-003",
       "status": "completed",
@@ -5658,6 +7366,426 @@
       "technician_confirmed": false,
       "notes": [
         "Created during inspection on 2026-01-22"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0151",
+      "asset_id": "ESC-SC-003",
+      "status": "open",
+      "priority": "P2",
+      "problem_code": "ME-021",
+      "fault_code": "STEP-SAG",
+      "action_code": "REPLACE",
+      "failure_class": "MECHANICAL",
+      "description": "Step Sag at steps 14-16 on Stadium-Chinatown Escalator #3 \u2014 4mm deflection beyond tolerance, trip hazard. Recurring issue \u2014 3 of last 5 inspections flagged Step Sag at this location.",
+      "created_by": "A. Sharma",
+      "created_at": "2026-02-20T14:30:00.000000",
+      "assigned_to": "J. Chen",
+      "photos": [],
+      "ai_confidence": 0.94,
+      "technician_confirmed": true,
+      "notes": [
+        "Created from inspection INSP-20260220-041",
+        "Recurring Step Sag \u2014 steps 14-16 showing progressive degradation",
+        "Previous inspections: Sep 2025 (1.5mm), Jan 2026 (3mm), Feb 2026 (4mm)"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0152",
+      "asset_id": "ESC-SC-003",
+      "status": "open",
+      "priority": "P4",
+      "problem_code": "ME-006",
+      "fault_code": "LUB-DRY",
+      "action_code": "LUBRICATE",
+      "failure_class": "MECHANICAL",
+      "description": "Drive chain and step chain lubrication overdue on Stadium-Chinatown Escalator #3. Early friction signs detected during inspection. Schedule preventive lubrication service.",
+      "created_by": "A. Sharma",
+      "created_at": "2026-02-20T14:45:00.000000",
+      "assigned_to": null,
+      "photos": [],
+      "ai_confidence": 0.87,
+      "technician_confirmed": true,
+      "notes": [
+        "Created from inspection INSP-20260220-041",
+        "Lubrication schedule 2 weeks overdue",
+        "No oil leak detected at time of inspection"
+      ]
+    },
+    {
+      "wo_id": "WO-2025-0156",
+      "asset_id": "ESC-SC-003",
+      "status": "completed",
+      "priority": "P3",
+      "problem_code": "ME-021",
+      "fault_code": "STEP-SAG",
+      "action_code": "ADJUST",
+      "failure_class": "MECHANICAL",
+      "description": "Step Sag at step 14 on Stadium-Chinatown Escalator #3 \u2014 adjusted step roller and chain tension",
+      "created_by": "R. Patel",
+      "created_at": "2025-09-25T10:15:00.000000",
+      "assigned_to": "A. Sharma",
+      "photos": [],
+      "ai_confidence": 0.85,
+      "technician_confirmed": true,
+      "notes": [
+        "Adjusted step roller alignment and chain tension",
+        "Step deflection returned to within tolerance after adjustment",
+        "Recommend monitoring \u2014 may require step replacement if sag recurs"
+      ]
+    },
+    {
+      "wo_id": "WO-2025-0157",
+      "asset_id": "ESC-SC-003",
+      "status": "completed",
+      "priority": "P3",
+      "problem_code": "ME-008",
+      "fault_code": "MTR-VIB",
+      "action_code": "LUBRICATE",
+      "failure_class": "MECHANICAL",
+      "description": "Drive motor startup noise on Stadium-Chinatown Escalator #3 \u2014 bearing lubrication performed",
+      "created_by": "J. Chen",
+      "created_at": "2025-11-20T09:00:00.000000",
+      "assigned_to": "J. Chen",
+      "photos": [],
+      "ai_confidence": 0.73,
+      "technician_confirmed": true,
+      "notes": [
+        "Motor bearings lubricated \u2014 startup noise resolved",
+        "Monitor for recurrence \u2014 may indicate bearing wear"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0158",
+      "asset_id": "ESC-SC-003",
+      "status": "completed",
+      "priority": "P4",
+      "problem_code": "ME-007",
+      "fault_code": "MECH-MIS",
+      "action_code": "ADJUST",
+      "failure_class": "MECHANICAL",
+      "description": "Handrail speed deviation +3.1% on Stadium-Chinatown Escalator #3 \u2014 drive tension adjusted",
+      "created_by": "R. Patel",
+      "created_at": "2026-01-10T11:30:00.000000",
+      "assigned_to": "D. Lee",
+      "photos": [],
+      "ai_confidence": 0.82,
+      "technician_confirmed": true,
+      "notes": [
+        "Handrail drive belt tension adjusted",
+        "Speed deviation corrected to within +/-2% tolerance"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0160",
+      "asset_id": "TC-139-D1",
+      "status": "completed",
+      "priority": "P3",
+      "problem_code": "ME-023",
+      "fault_code": "RS-DOOR-LCK",
+      "action_code": "RS-RPLC-LCK",
+      "failure_class": "MECHANICAL",
+      "description": "Door D1 lock assembly failure on Train Car #139 \u2014 lock mechanism not engaging; door isolated by operator, not passenger-related. Lock assembly replacement required.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T06:29:00",
+      "assigned_to": "V. Tech Rolling Stock",
+      "photos": [],
+      "ai_confidence": 0.91,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277408 \u2014 06:29 @ SRI | Consist: 140/139/48 | MK I 700/800",
+        "D1 isolated, not passenger related",
+        "Found lock assy not locking. Changed out lock assy on D1.",
+        "Cycled doors in manual and auto \u2014 OK. WO ref: 875490"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0161",
+      "asset_id": "TC-229-VOBC",
+      "status": "completed",
+      "priority": "P2",
+      "problem_code": "ME-024",
+      "fault_code": "RS-VOBC-HLT",
+      "action_code": "RS-RST-VOBC",
+      "failure_class": "ELECTRONIC",
+      "description": "VOBC halt on Train Car #229 at Columbia (ICI) \u2014 HMP module A6, BITE error code 17; ATP command stop triggered. VOBC reset performed, train returned to service.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T06:39:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.87,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277409 \u2014 06:39 @ ICI | Consist: 240/239/229 | MK II 1100/1200",
+        "VOBC halt, HMP A6, BITE error 17",
+        "No WO raised \u2014 reset performed by STA",
+        "Train returned to service"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0162",
+      "asset_id": "TC-205-D4",
+      "status": "completed",
+      "priority": "P3",
+      "problem_code": "ME-023",
+      "fault_code": "RS-DOOR-MTR",
+      "action_code": "RS-RPLC-MTR",
+      "failure_class": "MECHANICAL",
+      "description": "Door D4 motor failure on Train Car #205 at Production Way \u2014 motor not driving door open under power; door isolated by operator, not passenger-related. Motor replacement required.",
+      "created_by": "V. Tech Operations",
+      "created_at": "2026-03-02T07:25:00",
+      "assigned_to": "V. Tech Rolling Stock",
+      "photos": [],
+      "ai_confidence": 0.93,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277411 \u2014 07:25 @ PWI | Consist: 206/205 | MK II 1100/1200",
+        "D4 isolated, not passenger related",
+        "Changed out motor on door 4. Tested OK. WO ref: 875512"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0163",
+      "asset_id": "TC-258-D1",
+      "status": "open",
+      "priority": "P2",
+      "problem_code": "ME-023",
+      "fault_code": "RS-DOOR-STS",
+      "action_code": "INSPECT-DET",
+      "failure_class": "ELECTRONIC",
+      "description": "Loss of door status feedback on Train Car #258 at Renfrew (REO) \u2014 system unable to confirm door state; possible passenger interference, under investigation. WO still open.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T07:56:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.78,
+      "technician_confirmed": false,
+      "notes": [
+        "Incident 2026-277413 \u2014 07:56 @ REO | Consist: 258/257 | MK II 1100/1200",
+        "Unable to confirm if passenger caused",
+        "WO ref: 875527 \u2014 WO still open, under investigation"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0164",
+      "asset_id": "TC-036-D3",
+      "status": "completed",
+      "priority": "P3",
+      "problem_code": "ME-023",
+      "fault_code": "RS-DOOR-STS",
+      "action_code": "RESET",
+      "failure_class": "ELECTRONIC",
+      "description": "Door D3 not opening on Train Car #36 at Waterfront (WFO) \u2014 door isolated by operator. Door breaker reset performed; manual and auto door cycles completed with no fault found.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T15:38:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.85,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277445 \u2014 15:38 @ WFO | Consist: 142/141/36 | MK I 100/200",
+        "Un-isolated door 3. Reset door breaker.",
+        "Performed door cycles in manual and Auto \u2014 no fault found. WO ref: 875707"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0165",
+      "asset_id": "TC-438",
+      "status": "open",
+      "priority": "P2",
+      "problem_code": "ME-027",
+      "fault_code": "RS-HVAC-FLT",
+      "action_code": "RS-INV-HVAC",
+      "failure_class": "MECHANICAL",
+      "description": "HVAC system fault on Train Car #438 at Stadium (STI) \u2014 environmental control alarm will not clear. Compressor, condenser, and control board investigation required. WO still open.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T17:49:00",
+      "assigned_to": "V. Tech Rolling Stock",
+      "photos": [],
+      "ai_confidence": 0.82,
+      "technician_confirmed": false,
+      "notes": [
+        "Incident 2026-277454 \u2014 17:49 @ STI | MK III 2500/2800 | Single vehicle",
+        "HVAC fault \u2014 fault code FC2",
+        "WO ref: 875732 \u2014 WO still open, under investigation"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0166",
+      "asset_id": "TC-138-PROP",
+      "status": "open",
+      "priority": "P1",
+      "problem_code": "ME-025",
+      "fault_code": "RS-PROP-PCU",
+      "action_code": "RS-TGOUT-PCU",
+      "failure_class": "ELECTRONIC",
+      "description": "Propulsion PCU fault on Train Car #138 at Broadway-City Hall (BDO) \u2014 E1 end car, BITE error code 70. PCU tagged out under LOTO procedure. Train consist C-138 (88/138/68) degraded. WO still open. SAFETY: do not restore propulsion until LOTO cleared.",
+      "created_by": "V. Tech Operations",
+      "created_at": "2026-03-02T18:15:00",
+      "assigned_to": "V. Tech Rolling Stock",
+      "photos": [],
+      "ai_confidence": 0.95,
+      "technician_confirmed": false,
+      "notes": [
+        "Incident 2026-277458 \u2014 18:15 @ BDO | Consist: 88/138/68 | MK I 700/800",
+        "E1 car BITE error 70 \u2014 PCU tagged out under LOTO",
+        "Fault code FC6 | Propulsion car isolated",
+        "WO ref: 875733 \u2014 WO still open, V. Tech on site"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0167",
+      "asset_id": "TC-212-VOBC",
+      "status": "completed",
+      "priority": "P2",
+      "problem_code": "ME-024",
+      "fault_code": "RS-VOBC-SPD",
+      "action_code": "RS-RST-VOBC",
+      "failure_class": "ELECTRONIC",
+      "description": "VOBC overspeed fault on Train Car #212 at Lougheed (LNO) \u2014 ATP detected speed profile exceeded, emergency brake applied automatically. VOBC reset performed.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T20:18:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.88,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277469 \u2014 20:18 @ LNO | Consist: 212 | MK II 1100/1200",
+        "Overspeed fault \u2014 VOBC emergency brake applied",
+        "Cleared by STA \u2014 no WO raised (4th event for V212 today)"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0168",
+      "asset_id": "TC-332-VOBC",
+      "status": "open",
+      "priority": "P2",
+      "problem_code": "ME-024",
+      "fault_code": "RS-VOBC-HLT",
+      "action_code": "RS-RST-VOBC",
+      "failure_class": "ELECTRONIC",
+      "description": "VOBC halt on Train Car #332 at King George (KGO) \u2014 HMP module A7, BITE error 2C. Second occurrence today. Fault cleared on shift handover; recurring fault \u2014 monitor closely and schedule VOBC diagnostic.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T10:45:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.86,
+      "technician_confirmed": false,
+      "notes": [
+        "Incident 2026-277433 \u2014 10:45 @ KGO | Consist: 332/321/348 | MK II 1100/1200",
+        "HMP A7 BITE error 2C \u2014 second occurrence today",
+        "Cleared on handover \u2014 recurring fault, monitor closely"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0169",
+      "asset_id": "TC-212-VOBC",
+      "status": "completed",
+      "priority": "P2",
+      "problem_code": "ME-024",
+      "fault_code": "RS-VOBC-SPD",
+      "action_code": "RS-RST-VOBC",
+      "failure_class": "ELECTRONIC",
+      "description": "VOBC overspeed fault on Train Car #212 at Commercial-Broadway inbound (CMI) \u2014 emergency brake applied by ATP overspeed protection. Part of recurring overspeed pattern for TC-212 today.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T14:13:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.88,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277441 \u2014 14:13 @ CMI | Consist: 212/211 | MK II 1100/1200",
+        "EB applied by VOBC overspeed protection",
+        "Cleared at CMI \u2014 V212 recurring overspeed pattern"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0170",
+      "asset_id": "TC-212-VOBC",
+      "status": "completed",
+      "priority": "P2",
+      "problem_code": "ME-024",
+      "fault_code": "RS-VOBC-SPD",
+      "action_code": "RS-RST-VOBC",
+      "failure_class": "ELECTRONIC",
+      "description": "VOBC overspeed fault on Train Car #212 at Commercial-Broadway outbound (CMO) \u2014 EB applied; no recurrence past this point in consist run. 3rd overspeed event for TC-212 today.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T14:21:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.88,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277442 \u2014 14:21 @ CMO | Consist: 212/211 | MK II 1100/1200",
+        "EB applied \u2014 no faults past CMO",
+        "V212 overspeed pattern: LNO, CMI, CMO, PWO \u2014 VOBC investigation required"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0171",
+      "asset_id": "TC-480",
+      "status": "completed",
+      "priority": "P2",
+      "problem_code": "ME-026",
+      "fault_code": "RS-BRK-FLT",
+      "action_code": "RS-RST-BRK",
+      "failure_class": "MECHANICAL",
+      "description": "Brake system fault (FC2) on Train Car #480 at Joyce-Collingwood (JYI) \u2014 unexpected brake application detected. Line technician attended and cleared fault at station; train returned to service.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T15:54:00",
+      "assigned_to": "Line Technician",
+      "photos": [],
+      "ai_confidence": 0.84,
+      "technician_confirmed": true,
+      "notes": [
+        "Incident 2026-277447 \u2014 15:54 @ JYI | Consist: 480/479/478 | MK III 2500/2800",
+        "Brake fault FC2 \u2014 Line tech attended",
+        "Fault cleared at station (ST) \u2014 train back in service"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0172",
+      "asset_id": "TC-212-VOBC",
+      "status": "open",
+      "priority": "P1",
+      "problem_code": "ME-024",
+      "fault_code": "RS-VOBC-SPD",
+      "action_code": "INSPECT-DET",
+      "failure_class": "ELECTRONIC",
+      "description": "VOBC overspeed fault on Train Car #212 at Production Way outbound (PWO) \u2014 4th overspeed event today (LNO/CMI/CMO/PWO). Escalated to P1. Full VOBC speed sensor diagnostic and calibration required. TC-212 removed from priority service.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T19:54:00",
+      "assigned_to": "V. Tech Rolling Stock",
+      "photos": [],
+      "ai_confidence": 0.96,
+      "technician_confirmed": false,
+      "notes": [
+        "Incident 2026-277466 \u2014 19:54 @ PWO | Consist: 212 | MK II 1100/1200",
+        "4th overspeed event today \u2014 escalated to P1",
+        "VOBC speed sensing likely faulty \u2014 full VOBC diagnostic required",
+        "V212 removed from priority service pending investigation"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0173",
+      "asset_id": "TC-229-VOBC",
+      "status": "open",
+      "priority": "P2",
+      "problem_code": "ME-024",
+      "fault_code": "RS-VOBC-HLT",
+      "action_code": "RS-RST-VOBC",
+      "failure_class": "ELECTRONIC",
+      "description": "VOBC halt on Train Car #229 at Lake City Way (LHO) \u2014 HMP module A7, BITE error 17. Same error code as morning ICI incident. Recurring BITE 17 pattern \u2014 VOBC unit replacement under evaluation.",
+      "created_by": "STA Operations",
+      "created_at": "2026-03-02T20:12:00",
+      "assigned_to": "STA Control",
+      "photos": [],
+      "ai_confidence": 0.87,
+      "technician_confirmed": false,
+      "notes": [
+        "Incident 2026-277468 \u2014 20:12 @ LHO | Consist: 230/229 | MK II 1100/1200",
+        "HMP A7 BITE error 17 \u2014 same error code as morning incident at ICI",
+        "Recurring BITE 17 on V229 \u2014 VOBC inspection required"
       ]
     }
   ],
@@ -6107,7 +8235,7 @@
     },
     {
       "inspection_id": "INSP-20251031-014",
-      "asset_id": "TC-MT-002",
+      "asset_id": "TC-205",
       "inspector": "D. Lee",
       "date": "2025-10-31",
       "findings": [
@@ -6333,7 +8461,7 @@
     },
     {
       "inspection_id": "INSP-20260130-020",
-      "asset_id": "HVT-ED-001",
+      "asset_id": "TC-438",
       "inspector": "M. Singh",
       "date": "2026-01-30",
       "findings": [
@@ -6589,7 +8717,7 @@
     },
     {
       "inspection_id": "INSP-20251107-026",
-      "asset_id": "BOG-JC-002",
+      "asset_id": "TC-480",
       "inspector": "A. Thompson",
       "date": "2025-11-07",
       "findings": [
@@ -7019,7 +9147,7 @@
     },
     {
       "inspection_id": "INSP-20260119-036",
-      "asset_id": "DOR-BU-001",
+      "asset_id": "TC-139-D1",
       "inspector": "A. Thompson",
       "date": "2026-01-19",
       "findings": [
@@ -7040,7 +9168,7 @@
     },
     {
       "inspection_id": "INSP-20260120-037",
-      "asset_id": "DOR-PW-003",
+      "asset_id": "TC-205-D4",
       "inspector": "M. Singh",
       "date": "2026-01-20",
       "findings": [
@@ -7190,6 +9318,144 @@
       ],
       "overall_condition": "out_of_service",
       "next_inspection_due": "2026-08-09",
+      "work_orders_created": []
+    },
+    {
+      "inspection_id": "INSP-20260220-041",
+      "asset_id": "ESC-SC-003",
+      "inspector": "A. Sharma",
+      "date": "2026-02-20",
+      "findings": [
+        {
+          "finding_id": "F-041-1",
+          "description": "Step Sag detected at steps 14-16 \u2014 vertical deflection 4mm beyond tolerance, trip hazard risk",
+          "severity": "P2",
+          "problem_code": "ME-021",
+          "fault_code": "STEP-SAG",
+          "photo_url": null,
+          "ai_confidence": 0.94,
+          "technician_confirmed": true
+        },
+        {
+          "finding_id": "F-041-2",
+          "description": "Drive chain showing early signs of dry friction \u2014 lubrication schedule overdue",
+          "severity": "P3",
+          "problem_code": "ME-006",
+          "fault_code": "LUB-DRY",
+          "photo_url": null,
+          "ai_confidence": 0.87,
+          "technician_confirmed": true
+        }
+      ],
+      "overall_condition": "requires_attention",
+      "next_inspection_due": "2026-03-20",
+      "work_orders_created": [
+        "WO-2026-0151",
+        "WO-2026-0152"
+      ]
+    },
+    {
+      "inspection_id": "INSP-20260105-042",
+      "asset_id": "ESC-SC-003",
+      "inspector": "R. Patel",
+      "date": "2026-01-05",
+      "findings": [
+        {
+          "finding_id": "F-042-1",
+          "description": "Step Sag observed at steps 14-15 \u2014 3mm deflection, within monitoring threshold",
+          "severity": "P3",
+          "problem_code": "ME-021",
+          "fault_code": "STEP-SAG",
+          "photo_url": null,
+          "ai_confidence": 0.91,
+          "technician_confirmed": true
+        },
+        {
+          "finding_id": "F-042-2",
+          "description": "Handrail speed deviation +3.1% from step speed \u2014 adjustment needed",
+          "severity": "P4",
+          "problem_code": "ME-007",
+          "fault_code": "MECH-MIS",
+          "photo_url": null,
+          "ai_confidence": 0.82,
+          "technician_confirmed": true
+        }
+      ],
+      "overall_condition": "fair",
+      "next_inspection_due": "2026-02-05",
+      "work_orders_created": []
+    },
+    {
+      "inspection_id": "INSP-20251115-043",
+      "asset_id": "ESC-SC-003",
+      "inspector": "J. Chen",
+      "date": "2025-11-15",
+      "findings": [
+        {
+          "finding_id": "F-043-1",
+          "description": "Minor surface wear on comb plates \u2014 within acceptable range",
+          "severity": "P4",
+          "problem_code": "ME-003",
+          "fault_code": "WEAR-SUR",
+          "photo_url": null,
+          "ai_confidence": 0.78,
+          "technician_confirmed": true
+        },
+        {
+          "finding_id": "F-043-2",
+          "description": "Audible noise from drive motor during startup \u2014 monitoring recommended",
+          "severity": "P4",
+          "problem_code": "ME-008",
+          "fault_code": "MTR-VIB",
+          "photo_url": null,
+          "ai_confidence": 0.73,
+          "technician_confirmed": true
+        }
+      ],
+      "overall_condition": "good",
+      "next_inspection_due": "2025-12-15",
+      "work_orders_created": []
+    },
+    {
+      "inspection_id": "INSP-20250920-044",
+      "asset_id": "ESC-SC-003",
+      "inspector": "A. Sharma",
+      "date": "2025-09-20",
+      "findings": [
+        {
+          "finding_id": "F-044-1",
+          "description": "Step Sag beginning to develop at step 14 \u2014 1.5mm deflection, early stage",
+          "severity": "P4",
+          "problem_code": "ME-021",
+          "fault_code": "STEP-SAG",
+          "photo_url": null,
+          "ai_confidence": 0.85,
+          "technician_confirmed": true
+        }
+      ],
+      "overall_condition": "fair",
+      "next_inspection_due": "2025-10-20",
+      "work_orders_created": []
+    },
+    {
+      "inspection_id": "INSP-20250710-045",
+      "asset_id": "ESC-SC-003",
+      "inspector": "D. Lee",
+      "date": "2025-07-10",
+      "findings": [
+        {
+          "finding_id": "F-045-1",
+          "description": "All components within specification \u2014 routine preventive maintenance completed",
+          "severity": "P5",
+          "problem_code": "ME-003",
+          "fault_code": "WEAR-SUR",
+          "photo_url": null,
+          "ai_confidence": 0.95,
+          "technician_confirmed": true
+        }
+      ],
+      "overall_condition": "good",
+      "next_inspection_due": "2025-08-10",
       "work_orders_created": []
     }
   ],
@@ -7600,6 +9866,47 @@
         "monthly"
       ],
       "source": "Bombardier Climate System Manual"
+    },
+    {
+      "doc_id": "KB-026",
+      "title": "Escalator Drive Motor Maintenance & Safety Protocol",
+      "asset_types": [
+        "escalator"
+      ],
+      "department": "elevating_devices",
+      "content": "BCRTC Escalator Drive Motor Maintenance Protocol\n\nPRE-SERVICE SAFETY CHECKLIST:\n1. Initiate LOTO (Lock-Out Tag-Out) \u2014 isolate main power disconnect and verify zero energy state.\n2. Place barricades and signage at top and bottom landings.\n3. Verify emergency stop buttons are functional before and after maintenance.\n4. Wear required PPE: safety glasses, hearing protection (motor area >85dB), steel-toe boots, cut-resistant gloves.\n5. Confirm fire extinguisher is accessible in motor room.\n\nDRIVE MOTOR INSPECTION STEPS:\n1. Visual inspection: Check motor housing for cracks, oil seepage, or discoloration.\n2. Bearing assessment: Listen for grinding, rumbling, or whining during brief powered test run (with safety observer).\n3. Vibration measurement: Use handheld accelerometer \u2014 threshold: <4.5 mm/s RMS (ISO 10816). Flag >7.1 mm/s as P1.\n4. Temperature check: Motor casing <80\u00b0C, bearings <95\u00b0C. Use IR thermometer.\n5. Lubrication: Apply NLGI Grade 2 grease to motor bearings per OEM schedule (every 2000 operating hours or 6 months).\n6. Belt/chain tension: Verify drive chain tension within 12-15mm deflection at midspan.\n7. Electrical connections: Check terminal tightness, inspect cable insulation for heat damage.\n\nPOST-SERVICE:\n1. Remove LOTO, restore power.\n2. Perform 15-minute supervised test run \u2014 monitor vibration, noise, and temperature.\n3. Document all findings and measurements in work order.\n4. Update EAM system with next service due date.\n\nWARNING: If vibration exceeds 7.1 mm/s RMS or grinding noise is present, DO NOT operate escalator. Tag as Out of Service and create P1 work order immediately.",
+      "tags": [
+        "escalator",
+        "motor",
+        "drive",
+        "maintenance",
+        "safety",
+        "loto",
+        "lockout",
+        "vibration",
+        "bearing",
+        "checklist"
+      ],
+      "source": "BCRTC Maintenance Standards \u2014 Elevating Devices Section 4.3"
+    },
+    {
+      "doc_id": "KB-027",
+      "title": "Escalator Step Sag Diagnostic & Repair Procedure",
+      "asset_types": [
+        "escalator"
+      ],
+      "department": "elevating_devices",
+      "content": "Escalator Step Sag Diagnostic Procedure\n\nDEFINITION: Step Sag occurs when escalator steps deflect vertically beyond tolerance (>2mm), creating uneven riding surfaces and potential trip hazards.\n\nMEASUREMENT PROTOCOL:\n1. With escalator stopped and LOTO applied, place straightedge across 3 consecutive steps.\n2. Measure gap between straightedge and step surface using feeler gauge.\n3. Tolerance: <2mm acceptable, 2-3mm monitor monthly, 3-4mm schedule repair, >4mm immediate P2 action.\n\nROOT CAUSE ANALYSIS:\n- Step roller wear: Most common cause. Inspect rollers for flat spots, bearing play.\n- Chain elongation: Measure chain pitch \u2014 replace if >1% elongation from nominal.\n- Step axle bearing failure: Check for lateral play in step axle.\n- Track wear: Inspect step band tracks for groove wear or debris accumulation.\n\nREPAIR ACTIONS:\n1. For roller wear: Replace step roller assemblies (both trailing and leading).\n2. For chain elongation: Replace step chain section (minimum 10-link replacement).\n3. For individual step sag: Replace affected steps and adjacent steps (+/- 2 positions).\n4. After any repair: Run 30-minute test, re-measure all steps, verify <2mm tolerance.\n\nRECURRING PATTERN ALERT: If Step Sag recurs at the same position within 6 months, investigate structural support and track alignment at that section. May indicate track deflection requiring major overhaul.",
+      "tags": [
+        "escalator",
+        "step",
+        "sag",
+        "diagnostic",
+        "repair",
+        "trip hazard",
+        "measurement"
+      ],
+      "source": "BCRTC Maintenance Standards \u2014 Elevating Devices Section 3.7"
     }
   ]
 }

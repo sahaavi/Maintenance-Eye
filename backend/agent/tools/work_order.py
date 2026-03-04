@@ -7,8 +7,11 @@ import logging
 
 from models.schemas import WorkOrder, Priority, WorkOrderStatus
 from services.firestore_eam import get_eam_service
+from services.query_engine import QueryEngine
 
 logger = logging.getLogger("maintenance-eye.tools.work_order")
+
+_engine = QueryEngine()
 
 
 def _parse_priority(priority: str) -> Priority:
@@ -67,6 +70,21 @@ async def manage_work_order(
 
     try:
         if action == "create":
+            missing_fields: list[str] = []
+            if not (asset_id or "").strip():
+                missing_fields.append("asset_id")
+            if not (description or "").strip():
+                missing_fields.append("description")
+            if missing_fields:
+                return {
+                    "success": False,
+                    "error": (
+                        "Missing required fields for work order creation: "
+                        + ", ".join(missing_fields)
+                    ),
+                    "missing_fields": missing_fields,
+                }
+
             try:
                 resolved_priority = _parse_priority(priority or "P3")
             except ValueError:
@@ -123,10 +141,15 @@ async def manage_work_order(
         elif action == "get":
             if not wo_id:
                 return {"success": False, "error": "wo_id required for get"}
-            result = await eam.get_work_orders(asset_id=asset_id)
-            for wo in result:
-                if wo.wo_id == wo_id:
-                    return {"success": True, "work_order": wo.model_dump()}
+            # Try direct lookup first, then normalized ID candidates
+            wo = await eam.get_work_order(wo_id)
+            if not wo:
+                for candidate in QueryEngine.normalize_wo_id(wo_id):
+                    wo = await eam.get_work_order(candidate)
+                    if wo:
+                        break
+            if wo:
+                return {"success": True, "work_order": wo.model_dump()}
             return {"success": False, "error": f"Work order {wo_id} not found"}
 
         elif action == "list":
@@ -143,17 +166,66 @@ async def manage_work_order(
             }
 
         elif action == "search":
-            # Search work orders by text query across description, asset_id, codes
+            # Use query engine to normalize and expand search terms
+            search_text = description or notes or ""
+            parsed = _engine.build_query(search_text)
+
+            # Resolve status from explicit param or extracted filter
             try:
                 wo_status = _parse_work_order_status(status) if status else None
             except ValueError:
                 wo_status = None
+            if not wo_status and "status" in parsed.filters:
+                try:
+                    wo_status = _parse_work_order_status(parsed.filters["status"])
+                except ValueError:
+                    pass
+
+            # Resolve priority from explicit param or extracted filter
+            resolved_priority = priority or parsed.filters.get("priority", "")
+
+            # Resolve department from extracted filter
+            resolved_department = parsed.filters.get("department", "")
+
+            # Use normalized terms + extracted asset IDs for search
+            # Asset IDs get stripped from normalized_terms during cleaning,
+            # but they match against asset_id in the searchable text
+            import re as _re
+            _ASSET_PATTERN = _re.compile(r"[A-Z]{2,3}-[A-Z]{2}-\d{3,4}", _re.IGNORECASE)
+            search_parts = list(parsed.normalized_terms)
+            for eid in parsed.extracted_ids:
+                upper = eid.upper()
+                if not upper.startswith("WO-") and _ASSET_PATTERN.fullmatch(upper):
+                    search_parts.append(upper)
+            # Also include explicit asset_id param if provided
+            if asset_id and asset_id.upper() not in [p.upper() for p in search_parts]:
+                search_parts.append(asset_id)
+            q_text = " ".join(search_parts)
+
             result = await eam.search_work_orders(
-                q=description or notes or "",
-                priority=priority,
-                department="",
+                q=q_text,
+                priority=resolved_priority,
+                department=resolved_department,
                 status=wo_status,
+                location=parsed.filters.get("location", ""),
             )
+
+            # If few results, try with expanded terms as fallback
+            # IMPORTANT: preserve all filters from the original query
+            if len(result) < 3 and parsed.expanded_terms:
+                expanded_q = " ".join(parsed.expanded_terms)
+                expanded_result = await eam.search_work_orders(
+                    q=expanded_q,
+                    priority=resolved_priority,
+                    department=resolved_department,
+                    status=wo_status,
+                    location=parsed.filters.get("location", ""),
+                )
+                existing_ids = {wo.wo_id for wo in result}
+                for wo in expanded_result:
+                    if wo.wo_id not in existing_ids:
+                        result.append(wo)
+
             return {
                 "success": True,
                 "count": len(result),

@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -309,17 +309,17 @@
 
                 <div class="hud-data-left">
                     <div class="hud-v-line"></div>
-                    <span>LAT: 49.2827</span>
-                    <span>LNG: -123.1207</span>
-                    <span>ALT: 42m</span>
+                    <span id="hud-lat">LAT: 49.2827</span>
+                    <span id="hud-lng">LNG: -123.1207</span>
+                    <span id="hud-alt">ALT: 42m</span>
                     <div class="hud-v-line"></div>
                 </div>
 
                 <div class="hud-data-right">
                     <div class="hud-v-line"></div>
-                    <span>FPS: 30</span>
-                    <span>RES: 720P</span>
-                    <span>BIT: 2.4Mb</span>
+                    <span id="hud-fps">FPS: 30</span>
+                    <span id="hud-res">RES: 720P</span>
+                    <span id="hud-bit">BIT: 2.4Mb</span>
                     <div class="hud-v-line"></div>
                 </div>
 
@@ -405,7 +405,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js"></script>
 </body>
 
 </html>

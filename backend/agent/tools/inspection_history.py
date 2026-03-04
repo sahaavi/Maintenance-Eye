@@ -37,36 +37,48 @@ async def get_inspection_history(
     """
     eam = get_eam_service()
 
+    results = {
+        "asset_id": asset_id,
+        "inspection_count": 0,
+        "inspections": [],
+        "open_work_orders": [],
+        "recurring_issues": [],
+        "total_work_orders": 0,
+    }
+
+    # 1. Fetch Inspections
     try:
         inspections = await eam.get_inspection_history(asset_id, limit=limit)
-        work_orders = await eam.get_work_orders(asset_id=asset_id)
-
-        # Identify recurring issues
+        results["inspections"] = [i.model_dump() for i in inspections]
+        results["inspection_count"] = len(inspections)
+        
+        # Identify recurring issues from inspections
         fault_counts: dict[str, int] = {}
         for insp in inspections:
             for finding in insp.findings:
                 key = finding.fault_code
                 fault_counts[key] = fault_counts.get(key, 0) + 1
 
-        recurring = [
+        results["recurring_issues"] = [
             {"fault_code": code, "occurrences": count}
             for code, count in fault_counts.items()
             if count > 1
         ]
+    except Exception as e:
+        logger.error(f"History lookup (inspections) failed for {asset_id}: {e}")
+        results["inspection_error"] = str(e)
 
+    # 2. Fetch Work Orders
+    try:
+        work_orders = await eam.get_work_orders(asset_id=asset_id)
+        results["total_work_orders"] = len(work_orders)
+        
         open_wos = [
             wo for wo in work_orders if _status_value(wo.status) in OPEN_WORK_ORDER_STATUSES
         ]
-
-        return {
-            "asset_id": asset_id,
-            "inspection_count": len(inspections),
-            "inspections": [i.model_dump() for i in inspections],
-            "open_work_orders": [wo.model_dump() for wo in open_wos],
-            "recurring_issues": recurring,
-            "total_work_orders": len(work_orders),
-        }
-
+        results["open_work_orders"] = [wo.model_dump() for wo in open_wos]
     except Exception as e:
-        logger.error(f"History lookup failed: {e}")
-        return {"asset_id": asset_id, "error": str(e), "inspections": []}
+        logger.error(f"History lookup (work orders) failed for {asset_id}: {e}")
+        results["work_order_error"] = str(e)
+
+    return results

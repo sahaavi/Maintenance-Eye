@@ -6,6 +6,7 @@ Supports reads from seed data and in-memory writes for work orders.
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -109,13 +110,19 @@ class JsonEAM(EAMService):
                     " ".join(a.get("asset_hierarchy", [])),
                 ]).lower()
                 # Tokenized matching: all query words must appear in searchable text
-                query_tokens = query.lower().split()
+                query_tokens = re.findall(r"[a-zA-Z0-9]+", query.lower())
                 if not all(token in searchable for token in query_tokens):
                     continue
             results.append(Asset(**a))
         return results
 
     # --- Work Order Operations ---
+
+    async def get_work_order(self, wo_id: str) -> Optional[WorkOrder]:
+        data = self._work_orders.get(wo_id)
+        if data:
+            return WorkOrder(**data)
+        return None
 
     async def create_work_order(self, work_order: WorkOrder) -> WorkOrder:
         self._wo_counter += 1
@@ -198,23 +205,29 @@ class JsonEAM(EAMService):
                 continue
             if priority and wo.get("priority", "").upper() != priority.upper():
                 continue
-            if location_asset_ids is not None and wo.get("asset_id") not in location_asset_ids:
+            
+            aid = wo.get("asset_id", "")
+            asset = self._assets.get(aid, {})
+
+            if location_asset_ids is not None and aid not in location_asset_ids:
                 continue
-            if dept_asset_ids is not None and wo.get("asset_id") not in dept_asset_ids:
+            if dept_asset_ids is not None and aid not in dept_asset_ids:
                 continue
             if q:
                 searchable = " ".join([
-                    wo.get("wo_id", ""),
-                    wo.get("description", ""),
-                    wo.get("asset_id", ""),
-                    wo.get("problem_code", ""),
-                    wo.get("fault_code", ""),
-                    wo.get("action_code", ""),
-                    wo.get("assigned_to", ""),
-                    wo.get("equipment_id", ""),
+                    wo.get("wo_id", "") or "",
+                    wo.get("description", "") or "",
+                    aid or "",
+                    asset.get("name", "") or "",
+                    asset.get("location", {}).get("station", "") or "",
+                    wo.get("problem_code", "") or "",
+                    wo.get("fault_code", "") or "",
+                    wo.get("action_code", "") or "",
+                    wo.get("assigned_to", "") or "",
+                    wo.get("equipment_id", "") or "",
                 ]).lower()
                 # Tokenized matching: all query words must appear
-                query_tokens = q.lower().split()
+                query_tokens = re.findall(r"[a-zA-Z0-9]+", q.lower())
                 if not all(token in searchable for token in query_tokens):
                     continue
             results.append(WorkOrder(**wo))
@@ -275,19 +288,36 @@ class JsonEAM(EAMService):
 
     # --- Knowledge Base ---
 
+    # Words that describe document type, not content — strip from KB queries
+    _KB_META_WORDS = frozenset({
+        "protocol", "procedure", "manual", "guide", "guidelines", "standard",
+        "standards", "document", "checklist", "instructions", "handbook",
+        "specification", "reference", "sop",
+    })
+
     async def search_knowledge_base(
         self, query: str, asset_type: str = "", department: str = ""
     ) -> list[KnowledgeBaseEntry]:
         results = []
-        ql = query.lower()
         for k in self._knowledge_base:
             if department and k.get("department") != department:
                 continue
             if asset_type and asset_type not in k.get("asset_types", []):
                 continue
-            searchable = f"{k.get('title','')} {k.get('content','')} {' '.join(k.get('tags',[]))}".lower()
-            if ql in searchable:
-                results.append(KnowledgeBaseEntry(**k))
+            if query:
+                searchable = f"{k.get('title','')} {k.get('content','')} {' '.join(k.get('tags',[]))}".lower()
+                # Strip document-type meta words from query before matching
+                query_tokens = [
+                    t for t in re.findall(r"[a-zA-Z0-9]+", query.lower())
+                    if t not in self._KB_META_WORDS
+                ]
+                if not query_tokens:
+                    # Query was entirely meta words — match all entries
+                    results.append(KnowledgeBaseEntry(**k))
+                    continue
+                if not all(token in searchable for token in query_tokens):
+                    continue
+            results.append(KnowledgeBaseEntry(**k))
         return results
 
     # --- Feedback Loop ---

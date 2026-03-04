@@ -57,7 +57,7 @@ async def get_work_orders(
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}") from exc
 
     eam = get_eam_service()
-    has_advanced = q or priority or department or location
+    has_advanced = q or wo_status or priority or department or location
     if has_advanced:
         return await eam.search_work_orders(
             q=q, priority=priority, department=department,

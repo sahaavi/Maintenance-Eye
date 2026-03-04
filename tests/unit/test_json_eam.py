@@ -49,11 +49,22 @@ async def test_json_eam_create_and_update_work_order() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_json_eam_search_work_orders_with_location_join() -> None:
+async def test_json_eam_robust_tokenization_and_metadata_search() -> None:
     eam = JsonEAM()
-    locations = await eam.get_locations()
-    assert locations
-
-    station = locations[0]["station"]
-    results = await eam.search_work_orders(location=station)
-    assert isinstance(results, list)
+    
+    # 1. Test tokenization: query "#1" should match asset with "1" in its name/ID
+    # Most assets in seed data end with "#1", "#2", etc.
+    results = await eam.search_assets(query="Escalator #1")
+    assert results
+    # With robust tokenization, "#1" becomes "1", which should match "Escalator #1"
+    
+    # 2. Test search WOs by asset metadata
+    # Find an asset and search for its WOs by the asset's name
+    all_assets = await eam.search_assets()
+    asset = all_assets[0]
+    asset_name_part = asset.name.split()[0] # e.g., "Waterfront"
+    
+    results = await eam.search_work_orders(q=asset_name_part)
+    # This should now work because we include asset metadata in WO search
+    assert results
+    assert any(wo.asset_id == asset.asset_id for wo in results)
