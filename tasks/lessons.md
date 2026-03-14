@@ -1,5 +1,15 @@
 # Lessons Learned — Maintenance-Eye
 
+## 2026-03-13 - Ruff UP017 Auto-Fix Breaks Python 3.10 Compatibility
+
+**Context:** `confirmation_manager.py` used `from datetime import UTC` (Python 3.11+). Tests failed with `ImportError: cannot import name 'UTC' from 'datetime'` on WSL2 Python 3.10.
+
+**Root Cause:** `pyproject.toml` sets `target-version = "py312"` for ruff. The UP017 rule auto-converts `datetime.timezone.utc` → `datetime.UTC` on every file save via a PostToolUse hook (`ruff check --fix`). This creates code that's incompatible with Python 3.10.
+
+**Solution:** Added `"UP017"` to `[tool.ruff.lint] ignore` in `pyproject.toml`. Used `_UTC = timezone.utc` module-level constant in `confirmation_manager.py` and referenced `_UTC` throughout (ruff won't rewrite a variable reference).
+
+**Rule:** When the ruff target version is higher than the local dev Python version, add rules like UP017 to the ignore list to prevent auto-fixes that break local compatibility. Always use a module-level alias for version-gated stdlib constants.
+
 ## 2026-03-05 - Multi-Word Asset Types Must Suppress Conflicting Department Filters
 
 **Context:** Query "open work order for Metrotown Track Circuit 3" returned 0 results despite WO-2025-0006 existing. The word "track" triggered `department=guideway` via `DEPARTMENT_ALIASES`, while "track circuit" also set `asset_type=track_circuit`. Both filters applied independently, but TRC-MT-003 is `department=signal_telecom`, so the guideway filter excluded it.
