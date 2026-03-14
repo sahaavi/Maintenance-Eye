@@ -30,6 +30,7 @@
     /* Status */
     --status-online: #22c55e;
     --status-recording: #ef4444;
+    --accent-green: #22c55e;
 
     /* Spacing */
     --safe-area-top: env(safe-area-inset-top, 0px);
@@ -606,6 +607,7 @@ html, body {
     height: 40px;
     transform: translate(-50%, -50%);
     opacity: 0.4;
+    animation: crosshair-pulse 3s ease-in-out infinite;
 }
 
 .hud-crosshair::before, .hud-crosshair::after {
@@ -622,9 +624,7 @@ html, body {
     0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); }
     50% { opacity: 0.7; transform: translate(-50%, -50%) scale(1.1); }
 }
-.hud-crosshair {
-    animation: crosshair-pulse 3s ease-in-out infinite;
-}
+
 
 .hud-data-left, .hud-data-right {
     position: absolute;
@@ -906,6 +906,30 @@ html, body {
     display: block;
 }
 
+.markdown-content p {
+    margin: 0 0 8px 0;
+    line-height: 1.5;
+}
+
+.markdown-content p:last-child {
+    margin-bottom: 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+    margin: 0 0 8px 18px;
+    padding: 0;
+}
+
+.markdown-content li {
+    margin: 0 0 4px 0;
+    line-height: 1.5;
+}
+
+.markdown-content li:last-child {
+    margin-bottom: 0;
+}
+
 /* ==================== ANIMATIONS ==================== */
 
 .fade-in {
@@ -1073,17 +1097,17 @@ html, body {
     color: var(--text-muted);
 }
 
-.chat-send-btn {
-    background: var(--accent-gradient) !important;
-    border-color: transparent !important;
-    color: white !important;
+.chat-input-bar .chat-send-btn {
+    background: var(--accent-gradient);
+    border-color: transparent;
+    color: white;
     flex-shrink: 0;
 }
 
-#btn-chat-voice.active {
-    background: var(--accent-gradient) !important;
-    border-color: transparent !important;
-    color: white !important;
+.chat-input-bar #btn-chat-voice.active {
+    background: var(--accent-gradient);
+    border-color: transparent;
+    color: white;
     animation: mic-pulse 2s ease-in-out infinite;
 }
 

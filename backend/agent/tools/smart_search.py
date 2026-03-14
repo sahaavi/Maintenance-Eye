@@ -16,6 +16,7 @@ _engine = QueryEngine()
 
 from agent.tools.wrapper import tool_wrapper
 
+
 @tool_wrapper
 async def smart_search(
     query: str,
@@ -58,6 +59,8 @@ async def smart_search(
         - total: number of results found
         - results: list of ranked results, each with score, type, and data
         - search_metadata: normalization details for transparency
+        - optional confirmation hints when malformed asset IDs are detected:
+          `needs_asset_confirmation`, `guessed_assets`, `no_asset_match`
     """
     eam = get_eam_service()
 
@@ -90,10 +93,12 @@ async def smart_search(
                 entry["data"] = str(item)
             formatted_results.append(entry)
 
-        return {
+        response = {
+            "success": True,
             "intent": parsed.intent.value,
             "confidence": round(parsed.confidence, 2),
             "total": result.total,
+            "has_results": result.total > 0,
             "results": formatted_results,
             "search_metadata": {
                 "raw_input": parsed.raw_input,
@@ -105,12 +110,49 @@ async def smart_search(
             },
         }
 
+        if result.total == 0 and parsed.intent in {
+            SearchIntent.work_order,
+            SearchIntent.asset,
+            SearchIntent.auto,
+        }:
+            hints = QueryEngine.extract_asset_hints(query)
+            suggestions = await _engine.suggest_asset_candidates(query, eam, limit=3)
+            if suggestions:
+                suggestion_ids = ", ".join(s["asset_id"] for s in suggestions)
+                hinted = ", ".join(hints) if hints else "that asset ID"
+                response.update(
+                    {
+                        "needs_asset_confirmation": True,
+                        "attempted_asset_hints": hints,
+                        "guessed_assets": suggestions,
+                        "message": (
+                            f"No records found for {hinted}. Did you mean {suggestion_ids}?"
+                        ),
+                    }
+                )
+            elif hints:
+                hinted = ", ".join(hints)
+                response.update(
+                    {
+                        "no_asset_match": True,
+                        "attempted_asset_hints": hints,
+                        "message": (
+                            f"No asset found matching {hinted}. "
+                            "Ask the user to confirm the exact asset tag."
+                        ),
+                    }
+                )
+
+        return response
+
     except Exception as e:
         logger.error(f"Smart search failed: {e}", exc_info=True)
         return {
+            "success": False,
             "intent": "error",
             "confidence": 0,
             "total": 0,
+            "has_results": False,
             "results": [],
             "error": str(e),
         }

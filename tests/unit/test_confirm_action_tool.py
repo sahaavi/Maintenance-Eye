@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pytest
-
-from agent.tools.confirm_action import propose_action, set_session_context  # type: ignore[import-not-found]
+from agent.tools.confirm_action import (  # type: ignore[import-not-found]
+    propose_action,
+    set_session_context,
+)
 
 
 @pytest.mark.asyncio

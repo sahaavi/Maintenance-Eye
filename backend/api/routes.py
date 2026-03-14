@@ -5,9 +5,8 @@ Uses get_eam_service() which returns FirestoreEAM or JsonEAM fallback transparen
 """
 
 import logging
-from fastapi import APIRouter, HTTPException
-from typing import Optional
 
+from fastapi import APIRouter, HTTPException
 from models.schemas import WorkOrderStatus
 from services.firestore_eam import get_eam_service
 
@@ -42,7 +41,7 @@ async def search_assets(
 @router.get("/work-orders")
 async def get_work_orders(
     asset_id: str = "",
-    status: Optional[str] = None,
+    status: str | None = None,
     q: str = "",
     priority: str = "",
     department: str = "",
@@ -60,8 +59,11 @@ async def get_work_orders(
     has_advanced = q or wo_status or priority or department or location
     if has_advanced:
         return await eam.search_work_orders(
-            q=q, priority=priority, department=department,
-            status=wo_status, location=location,
+            q=q,
+            priority=priority,
+            department=department,
+            status=wo_status,
+            location=location,
         )
     return await eam.get_work_orders(asset_id=asset_id, status=wo_status)
 
@@ -102,10 +104,12 @@ async def get_eam_codes(code_type: str = "", department: str = "", asset_type: s
 # Confirmation endpoints (human-in-the-loop)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/sessions/{session_id}/pending")
 async def get_pending_actions(session_id: str):
     """Get pending actions for a session that need technician confirmation."""
     from services.confirmation_manager import get_confirmation_manager
+
     mgr = get_confirmation_manager(session_id)
     pending = mgr.get_pending()
     return {
@@ -119,6 +123,7 @@ async def get_pending_actions(session_id: str):
 async def confirm_action(session_id: str, action_id: str, notes: str = ""):
     """Technician confirms a proposed action."""
     from services.confirmation_manager import get_confirmation_manager
+
     mgr = get_confirmation_manager(session_id)
     action = mgr.confirm(action_id, notes)
     if not action:
@@ -130,6 +135,7 @@ async def confirm_action(session_id: str, action_id: str, notes: str = ""):
 async def reject_action(session_id: str, action_id: str, notes: str = ""):
     """Technician rejects a proposed action."""
     from services.confirmation_manager import get_confirmation_manager
+
     mgr = get_confirmation_manager(session_id)
     action = mgr.reject(action_id, notes)
     if not action:
@@ -141,6 +147,7 @@ async def reject_action(session_id: str, action_id: str, notes: str = ""):
 async def correct_action(session_id: str, action_id: str, corrections: dict = {}, notes: str = ""):
     """Technician corrects a proposed action with updated values."""
     from services.confirmation_manager import get_confirmation_manager
+
     mgr = get_confirmation_manager(session_id)
     action = mgr.correct(action_id, corrections, notes)
     if not action:
@@ -152,6 +159,7 @@ async def correct_action(session_id: str, action_id: str, corrections: dict = {}
 async def get_session_stats(session_id: str):
     """Get confirmation workflow stats for a session."""
     from services.confirmation_manager import get_confirmation_manager
+
     mgr = get_confirmation_manager(session_id)
     return {"session_id": session_id, **mgr.get_stats()}
 
@@ -159,6 +167,7 @@ async def get_session_stats(session_id: str):
 # ---------------------------------------------------------------------------
 # Report generation endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/reports/generate")
 async def generate_report_html(
@@ -169,8 +178,8 @@ async def generate_report_html(
 ):
     """Generate an inspection report and return HTML."""
     from agent.tools.report_generator import generate_report
-    from services.report_renderer import render_report_html
     from fastapi.responses import HTMLResponse
+    from services.report_renderer import render_report_html
 
     result = await generate_report(
         asset_id=asset_id,
@@ -195,8 +204,8 @@ async def generate_report_pdf(
 ):
     """Generate an inspection report and return downloadable PDF."""
     from agent.tools.report_generator import generate_report
-    from services.report_renderer import render_report_pdf
     from fastapi.responses import Response
+    from services.report_renderer import render_report_pdf
 
     result = await generate_report(
         asset_id=asset_id,

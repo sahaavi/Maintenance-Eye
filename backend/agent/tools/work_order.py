@@ -5,7 +5,7 @@ ADK tool function for creating and updating maintenance work orders.
 
 import logging
 
-from models.schemas import WorkOrder, Priority, WorkOrderStatus
+from models.schemas import Priority, WorkOrder, WorkOrderStatus
 from services.firestore_eam import get_eam_service
 from services.query_engine import QueryEngine
 
@@ -25,6 +25,7 @@ def _parse_work_order_status(status: str) -> WorkOrderStatus:
 
 
 from agent.tools.wrapper import tool_wrapper
+
 
 @tool_wrapper
 async def manage_work_order(
@@ -51,6 +52,9 @@ async def manage_work_order(
               the `description` parameter. Each word is matched independently
               against wo_id, description, asset_id, and EAM codes.
               Optionally filter by priority and status.
+              If no work orders are found and the asset ID appears malformed,
+              returns `needs_asset_confirmation` + `guessed_assets` so the
+              agent can confirm the intended asset before retrying.
         asset_id: The asset ID this work order relates to.
         wo_id: Work order ID (required for "update" and "get").
         description: Description of the issue found. For "search", put search terms here.
@@ -89,7 +93,10 @@ async def manage_work_order(
                 resolved_priority = _parse_priority(priority or "P3")
             except ValueError:
                 allowed = ", ".join([p.value for p in Priority])
-                return {"success": False, "error": f"Invalid priority: {priority}. Allowed: {allowed}"}
+                return {
+                    "success": False,
+                    "error": f"Invalid priority: {priority}. Allowed: {allowed}",
+                }
 
             wo = WorkOrder(
                 wo_id="",  # Will be auto-generated
@@ -120,7 +127,10 @@ async def manage_work_order(
                     updates["status"] = _parse_work_order_status(status).value
                 except ValueError:
                     allowed = ", ".join([s.value for s in WorkOrderStatus])
-                    return {"success": False, "error": f"Invalid status: {status}. Allowed: {allowed}"}
+                    return {
+                        "success": False,
+                        "error": f"Invalid status: {status}. Allowed: {allowed}",
+                    }
             if notes:
                 updates["notes"] = [notes]
             if priority:
@@ -128,7 +138,10 @@ async def manage_work_order(
                     updates["priority"] = _parse_priority(priority).value
                 except ValueError:
                     allowed = ", ".join([p.value for p in Priority])
-                    return {"success": False, "error": f"Invalid priority: {priority}. Allowed: {allowed}"}
+                    return {
+                        "success": False,
+                        "error": f"Invalid priority: {priority}. Allowed: {allowed}",
+                    }
             result = await eam.update_work_order(wo_id, updates)
             if result:
                 return {
@@ -190,16 +203,16 @@ async def manage_work_order(
             # Use normalized terms + extracted asset IDs for search
             # Asset IDs get stripped from normalized_terms during cleaning,
             # but they match against asset_id in the searchable text
-            import re as _re
-            _ASSET_PATTERN = _re.compile(r"[A-Z]{2,3}-[A-Z]{2}-\d{3,4}", _re.IGNORECASE)
             search_parts = list(parsed.normalized_terms)
+            existing_upper = {part.upper() for part in search_parts}
             for eid in parsed.extracted_ids:
                 upper = eid.upper()
-                if not upper.startswith("WO-") and _ASSET_PATTERN.fullmatch(upper):
+                if not upper.startswith("WO-") and upper not in existing_upper:
                     search_parts.append(upper)
+                    existing_upper.add(upper)
             # Also include explicit asset_id param if provided
-            if asset_id and asset_id.upper() not in [p.upper() for p in search_parts]:
-                search_parts.append(asset_id)
+            if asset_id and asset_id.upper() not in existing_upper:
+                search_parts.append(asset_id.upper())
             q_text = " ".join(search_parts)
 
             result = await eam.search_work_orders(
@@ -226,11 +239,40 @@ async def manage_work_order(
                     if wo.wo_id not in existing_ids:
                         result.append(wo)
 
-            return {
+            response = {
                 "success": True,
                 "count": len(result),
                 "work_orders": [wo.model_dump() for wo in result[:20]],
             }
+            if not result:
+                hints = QueryEngine.extract_asset_hints(search_text)
+                suggestions = await _engine.suggest_asset_candidates(search_text, eam, limit=3)
+                if suggestions:
+                    suggestion_ids = ", ".join(s["asset_id"] for s in suggestions)
+                    hinted = ", ".join(hints) if hints else "that asset ID"
+                    response.update(
+                        {
+                            "needs_asset_confirmation": True,
+                            "attempted_asset_hints": hints,
+                            "guessed_assets": suggestions,
+                            "message": (
+                                f"No work orders found for {hinted}. Did you mean {suggestion_ids}?"
+                            ),
+                        }
+                    )
+                elif hints:
+                    hinted = ", ".join(hints)
+                    response.update(
+                        {
+                            "no_asset_match": True,
+                            "attempted_asset_hints": hints,
+                            "message": (
+                                f"No asset found matching {hinted}. "
+                                "Please confirm the exact asset tag."
+                            ),
+                        }
+                    )
+            return response
 
         else:
             return {"success": False, "error": f"Unknown action: {action}"}

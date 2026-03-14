@@ -25,6 +25,7 @@ Maintenance-Eye is a **real-time AI-powered visual inspection agent** for field 
 ⚡ Cloud Run Backend (FastAPI)
        ↕
 🤖 Google ADK Agent ("Max")
+   ├── 🔎 smart_search
    ├── 🔧 lookup_asset
    ├── 📜 get_inspection_history
    ├── 📚 search_knowledge_base
@@ -114,14 +115,20 @@ Maintenance-Eye/
 │   ├── config.py             # Environment configuration
 │   ├── api/
 │   │   ├── routes.py         # REST endpoints
-│   │   └── websocket.py      # WebSocket handler
+│   │   ├── websocket.py      # WebSocket handler (Live + Chat)
+│   │   └── websocket_helpers.py  # Confirmation & media card helpers
 │   ├── agent/
 │   │   ├── maintenance_agent.py  # ADK agent definition
 │   │   ├── prompts.py        # System prompts & persona
-│   │   └── tools/            # 8 ADK tool functions
+│   │   └── tools/            # 9 ADK tool functions
 │   ├── services/
 │   │   ├── eam_interface.py  # Abstract EAM service
-│   │   └── firestore_eam.py  # Firestore implementation
+│   │   ├── base_eam.py       # Shared search helpers
+│   │   ├── json_eam.py       # JSON file fallback
+│   │   ├── firestore_eam.py  # Firestore implementation
+│   │   ├── query_engine.py   # NLP pre-query intelligence
+│   │   ├── search_matcher.py # Token-aware text matching
+│   │   └── seeder.py         # Firestore data seeder
 │   └── models/
 │       └── schemas.py        # Pydantic data models
 ├── frontend/
@@ -129,10 +136,13 @@ Maintenance-Eye/
 │   ├── style.css             # Dark theme UI
 │   ├── app.js                # Client application
 │   └── manifest.json         # PWA manifest
+├── tests/                    # Unit, integration & E2E tests
+├── data/                     # Seed data (JSON)
 ├── terraform/                # Infrastructure as Code
 ├── scripts/                  # Deployment & data scripts
-├── Dockerfile                # Container build
-└── hackathon/                # Rules & demo script
+├── demo/                     # Demo script & video analysis
+├── hackathon/                # Challenge rules
+└── Dockerfile                # Container build
 ```
 
 ## Category
@@ -146,6 +156,16 @@ Maintenance-Eye/
 - **Cloud Storage** — Stores inspection photos and reports
 - **Gemini 2.5 Flash** (Live API) — Real-time multimodal AI
 - **Cloud Build** + **Artifact Registry** — CI/CD pipeline
+
+## How We Built It
+
+Built with **Google ADK** (Agent Development Kit) and the **Gemini 2.5 Flash Live API** for real-time multimodal interaction. The agent ("Max") processes live camera frames at 2 FPS and bidirectional audio (PCM 16kHz in, 24kHz out) over WebSocket, enabling hands-free inspection while technicians work.
+
+**Key challenge:** Speech-to-text splits equipment IDs unpredictably ("ESC-SC-003" becomes "e s c s c zero zero three"). We built a QueryEngine NLP layer that normalizes ASR-transcribed IDs, expands domain synonyms, and resolves fuzzy matches — making voice-driven equipment lookup reliable in noisy field environments.
+
+**Key learning:** Safety-critical work order creation requires multi-layered validation. We enforce required fields at three independent checkpoints: proposal, tool execution, and post-confirmation automation — so no layer can be bypassed.
+
+**What's next:** Integration with production EAM systems (Hexagon, SAP PM), multi-language support for diverse maintenance teams, and offline-first PWA capabilities for underground or remote inspection sites.
 
 ## License
 

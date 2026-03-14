@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 
 import pytest
-
 from services.json_eam import JsonEAM  # type: ignore[import-not-found]
 
 

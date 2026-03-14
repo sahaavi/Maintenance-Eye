@@ -95,7 +95,9 @@ class FakeEAM:
     async def get_asset(self, asset_id: str):
         return next((a for a in self.assets if a.asset_id == asset_id), None)
 
-    async def search_assets(self, query: str = "", department: str = "", station: str = "", asset_type: str = ""):
+    async def search_assets(
+        self, query: str = "", department: str = "", station: str = "", asset_type: str = ""
+    ):
         result = self.assets
         if department:
             result = [a for a in result if a.department.value == department]
@@ -105,11 +107,13 @@ class FakeEAM:
             result = [a for a in result if a.type == asset_type]
         if query:
             q = query.lower()
-            result = [a for a in result if q in f"{a.asset_id} {a.name} {a.location.station}".lower()]
+            result = [
+                a for a in result if q in f"{a.asset_id} {a.name} {a.location.station}".lower()
+            ]
         return result
 
     async def create_work_order(self, work_order: WorkOrder):
-        work_order.wo_id = f"WO-2026-{len(self.work_orders)+1:04d}"
+        work_order.wo_id = f"WO-2026-{len(self.work_orders) + 1:04d}"
         self.work_orders.append(work_order)
         return work_order
 
@@ -131,7 +135,9 @@ class FakeEAM:
             result = [wo for wo in result if wo.status == status]
         return result
 
-    async def search_work_orders(self, q: str = "", priority: str = "", department: str = "", status=None, location: str = ""):
+    async def search_work_orders(
+        self, q: str = "", priority: str = "", department: str = "", status=None, location: str = ""
+    ):
         result = self.work_orders
         if status:
             result = [wo for wo in result if wo.status == status]
@@ -139,10 +145,16 @@ class FakeEAM:
             result = [wo for wo in result if wo.priority.value == priority.upper()]
         if q:
             ql = q.lower()
-            result = [wo for wo in result if ql in f"{wo.wo_id} {wo.description} {wo.asset_id}".lower()]
+            result = [
+                wo for wo in result if ql in f"{wo.wo_id} {wo.description} {wo.asset_id}".lower()
+            ]
         if location:
             station_by_asset = {a.asset_id: a.location.station for a in self.assets}
-            result = [wo for wo in result if location.lower() in station_by_asset.get(wo.asset_id, "").lower()]
+            result = [
+                wo
+                for wo in result
+                if location.lower() in station_by_asset.get(wo.asset_id, "").lower()
+            ]
         if department:
             dept_by_asset = {a.asset_id: a.department.value for a in self.assets}
             result = [wo for wo in result if dept_by_asset.get(wo.asset_id) == department]
@@ -152,12 +164,15 @@ class FakeEAM:
         out = {}
         for asset in self.assets:
             station = asset.location.station
-            out.setdefault(station, {
-                "station": station,
-                "station_code": asset.location.station_code,
-                "zone": asset.location.zone,
-                "asset_count": 0,
-            })
+            out.setdefault(
+                station,
+                {
+                    "station": station,
+                    "station_code": asset.location.station_code,
+                    "zone": asset.location.zone,
+                    "asset_count": 0,
+                },
+            )
             out[station]["asset_count"] += 1
         return sorted(out.values(), key=lambda s: s["station"])
 

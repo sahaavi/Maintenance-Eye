@@ -12,8 +12,8 @@ import logging
 from contextvars import ContextVar
 
 from services.confirmation_manager import (
-    get_confirmation_manager,
     ActionType,
+    get_confirmation_manager,
 )
 
 logger = logging.getLogger("maintenance-eye.tools.confirm")
@@ -21,9 +21,7 @@ logger = logging.getLogger("maintenance-eye.tools.confirm")
 from agent.tools.wrapper import tool_wrapper
 
 # Session context scoped per async task to avoid cross-session leakage.
-_session_id_ctx: ContextVar[str] = ContextVar(
-    "maintenance_eye_session_id", default="default"
-)
+_session_id_ctx: ContextVar[str] = ContextVar("maintenance_eye_session_id", default="default")
 
 
 def set_session_context(session_id: str):
@@ -79,7 +77,7 @@ def propose_action(
         return {
             "success": False,
             "error": f"Invalid action_type: {action_type}. "
-                     f"Must be one of: {[e.value for e in ActionType]}"
+            f"Must be one of: {[e.value for e in ActionType]}",
         }
 
     if at == ActionType.CREATE_WORK_ORDER:

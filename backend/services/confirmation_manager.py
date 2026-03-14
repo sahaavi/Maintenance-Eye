@@ -13,16 +13,19 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional, Callable, Any
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("maintenance-eye.confirmation")
 
+# Python 3.10 compat: datetime.UTC was added in 3.11
+_UTC = timezone.utc
+
 
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
+
 
 class ActionType(str, Enum):
     CREATE_WORK_ORDER = "create_work_order"
@@ -42,6 +45,7 @@ class ConfirmationStatus(str, Enum):
 
 class PendingAction(BaseModel):
     """An action proposed by the agent that needs technician confirmation."""
+
     action_id: str = Field(default_factory=lambda: f"ACT-{uuid.uuid4().hex[:8]}")
     action_type: ActionType
     session_id: str
@@ -50,16 +54,15 @@ class PendingAction(BaseModel):
     proposed_data: dict = Field(default_factory=dict)
     ai_confidence: float = 0.0
     status: ConfirmationStatus = ConfirmationStatus.PENDING
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
-    resolved_at: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(tz=_UTC).isoformat())
+    resolved_at: str | None = None
     technician_notes: str = ""
     corrections: dict = Field(default_factory=dict)
 
 
 class ConfirmationResult(BaseModel):
     """Result after technician responds to a pending action."""
+
     action_id: str
     status: ConfirmationStatus
     corrections: dict = Field(default_factory=dict)
@@ -69,6 +72,7 @@ class ConfirmationResult(BaseModel):
 # ---------------------------------------------------------------------------
 # Confirmation Manager
 # ---------------------------------------------------------------------------
+
 
 class ConfirmationManager:
     """
@@ -109,27 +113,27 @@ class ConfirmationManager:
         )
         return action
 
-    def confirm(self, action_id: str, technician_notes: str = "") -> Optional[PendingAction]:
+    def confirm(self, action_id: str, technician_notes: str = "") -> PendingAction | None:
         """Technician confirms the proposed action."""
         action = self._pending.pop(action_id, None)
         if not action:
             logger.warning(f"Action {action_id} not found or already resolved")
             return None
         action.status = ConfirmationStatus.CONFIRMED
-        action.resolved_at = datetime.now(timezone.utc).isoformat()
+        action.resolved_at = datetime.now(tz=_UTC).isoformat()
         action.technician_notes = technician_notes
         self._history.append(action)
         logger.info(f"[{self.session_id}] Confirmed: {action_id}")
         return action
 
-    def reject(self, action_id: str, technician_notes: str = "") -> Optional[PendingAction]:
+    def reject(self, action_id: str, technician_notes: str = "") -> PendingAction | None:
         """Technician rejects the proposed action."""
         action = self._pending.pop(action_id, None)
         if not action:
             logger.warning(f"Action {action_id} not found or already resolved")
             return None
         action.status = ConfirmationStatus.REJECTED
-        action.resolved_at = datetime.now(timezone.utc).isoformat()
+        action.resolved_at = datetime.now(tz=_UTC).isoformat()
         action.technician_notes = technician_notes
         self._history.append(action)
         logger.info(f"[{self.session_id}] Rejected: {action_id}")
@@ -140,7 +144,7 @@ class ConfirmationManager:
         action_id: str,
         corrections: dict,
         technician_notes: str = "",
-    ) -> Optional[PendingAction]:
+    ) -> PendingAction | None:
         """
         Technician corrects the proposed action (e.g., changes EAM codes).
         The corrected data is merged into the proposed data.
@@ -150,23 +154,20 @@ class ConfirmationManager:
             logger.warning(f"Action {action_id} not found or already resolved")
             return None
         action.status = ConfirmationStatus.CORRECTED
-        action.resolved_at = datetime.now(timezone.utc).isoformat()
+        action.resolved_at = datetime.now(tz=_UTC).isoformat()
         action.corrections = corrections
         action.technician_notes = technician_notes
         # Apply corrections to the proposed data
         action.proposed_data.update(corrections)
         self._history.append(action)
-        logger.info(
-            f"[{self.session_id}] Corrected: {action_id} — "
-            f"{list(corrections.keys())}"
-        )
+        logger.info(f"[{self.session_id}] Corrected: {action_id} — {list(corrections.keys())}")
         return action
 
     def get_pending(self) -> list[PendingAction]:
         """Get all pending (unresolved) actions."""
         return list(self._pending.values())
 
-    def get_pending_by_id(self, action_id: str) -> Optional[PendingAction]:
+    def get_pending_by_id(self, action_id: str) -> PendingAction | None:
         """Get a specific pending action."""
         return self._pending.get(action_id)
 
@@ -178,7 +179,13 @@ class ConfirmationManager:
         """Get summary stats for this session's confirmation workflow."""
         total = len(self._history)
         if total == 0:
-            return {"total": 0, "confirmed": 0, "rejected": 0, "corrected": 0, "pending": len(self._pending)}
+            return {
+                "total": 0,
+                "confirmed": 0,
+                "rejected": 0,
+                "corrected": 0,
+                "pending": len(self._pending),
+            }
         confirmed = sum(1 for a in self._history if a.status == ConfirmationStatus.CONFIRMED)
         rejected = sum(1 for a in self._history if a.status == ConfirmationStatus.REJECTED)
         corrected = sum(1 for a in self._history if a.status == ConfirmationStatus.CORRECTED)
@@ -206,7 +213,7 @@ def get_confirmation_manager(session_id: str) -> ConfirmationManager:
     return _session_managers[session_id]
 
 
-def remove_confirmation_manager(session_id: str) -> Optional[dict]:
+def remove_confirmation_manager(session_id: str) -> dict | None:
     """Remove and return stats when a session ends."""
     mgr = _session_managers.pop(session_id, None)
     if mgr:

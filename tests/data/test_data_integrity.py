@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SEED_PATH = ROOT / "data" / "seed_data.json"
 DRIFT_BASELINE_PATH = ROOT / "tests" / "data" / "drift_baseline.json"

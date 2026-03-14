@@ -5,31 +5,29 @@ with synthetic data for the hackathon.
 """
 
 import logging
-import re
-from typing import Optional
 from datetime import datetime
 
-from google.cloud import firestore
 import google.auth
-from google.auth.exceptions import DefaultCredentialsError
-
 from config import settings
+from google.auth.exceptions import DefaultCredentialsError
+from google.cloud import firestore
 from models.schemas import (
     Asset,
-    WorkOrder,
-    Priority,
-    WorkOrderStatus,
+    CorrectionLog,
     EAMCode,
     InspectionRecord,
     KnowledgeBaseEntry,
-    CorrectionLog,
+    WorkOrder,
+    WorkOrderStatus,
 )
+from services.base_eam import BaseEAMService
 from services.eam_interface import EAMService
+from services.search_matcher import query_matches_text
 
 logger = logging.getLogger("maintenance-eye.firestore")
 
 
-class FirestoreEAM(EAMService):
+class FirestoreEAM(BaseEAMService):
     """
     Firestore-backed EAM service for hackathon demo.
     Uses synthetic data that mirrors real Hexagon EAM structure.
@@ -41,15 +39,13 @@ class FirestoreEAM(EAMService):
             database=settings.FIRESTORE_DATABASE,
         )
         if settings.use_emulator:
-            logger.info(
-                f"Using Firestore emulator at {settings.FIRESTORE_EMULATOR_HOST}"
-            )
+            logger.info(f"Using Firestore emulator at {settings.FIRESTORE_EMULATOR_HOST}")
         else:
             logger.info("Using Cloud Firestore")
 
     # --- Asset Operations ---
 
-    async def get_asset(self, asset_id: str) -> Optional[Asset]:
+    async def get_asset(self, asset_id: str) -> Asset | None:
         doc = await self.db.collection("assets").document(asset_id).get()
         if doc.exists:
             return Asset(**doc.to_dict())
@@ -74,35 +70,18 @@ class FirestoreEAM(EAMService):
         async for doc in docs:
             data = doc.to_dict()
             asset = Asset(**data)
-            # Client-side filtering for text search (Firestore limitation)
+            if station and station.lower() not in asset.location.station.lower():
+                continue
             if query:
-                searchable = " ".join([
-                    asset.name,
-                    asset.asset_id,
-                    asset.type,
-                    asset.department,
-                    data.get("equipment_code", ""),
-                    data.get("manufacturer", ""),
-                    data.get("model", ""),
-                    asset.location.station,
-                    asset.location.station_code,
-                    getattr(asset.location, "zone", ""),
-                    " ".join(data.get("asset_hierarchy", [])),
-                ]).lower()
-                # Tokenized matching: all query words must appear
-                query_tokens = re.findall(r"[a-zA-Z0-9]+", query.lower())
-                if all(token in searchable for token in query_tokens):
-                    results.append(asset)
-            elif station:
-                if station.lower() in asset.location.station.lower():
-                    results.append(asset)
-            else:
-                results.append(asset)
+                searchable = self.build_asset_searchable(data)
+                if not query_matches_text(query, searchable):
+                    continue
+            results.append(asset)
         return results
 
     # --- Work Order Operations ---
 
-    async def get_work_order(self, wo_id: str) -> Optional[WorkOrder]:
+    async def get_work_order(self, wo_id: str) -> WorkOrder | None:
         doc = await self.db.collection("work_orders").document(wo_id).get()
         if doc.exists:
             return WorkOrder(**doc.to_dict())
@@ -135,26 +114,12 @@ class FirestoreEAM(EAMService):
         logger.info(f"Created work order: {work_order.wo_id}")
         return work_order
 
-    async def update_work_order(
-        self, wo_id: str, updates: dict
-    ) -> Optional[WorkOrder]:
+    async def update_work_order(self, wo_id: str, updates: dict) -> WorkOrder | None:
         ref = self.db.collection("work_orders").document(wo_id)
         doc = await ref.get()
         if not doc.exists:
             return None
-        normalized_updates = dict(updates)
-        if "status" in normalized_updates:
-            value = normalized_updates["status"]
-            normalized_updates["status"] = (
-                value.value if isinstance(value, WorkOrderStatus)
-                else WorkOrderStatus(str(value).lower()).value
-            )
-        if "priority" in normalized_updates:
-            value = normalized_updates["priority"]
-            normalized_updates["priority"] = (
-                value.value if isinstance(value, Priority)
-                else Priority(str(value).upper()).value
-            )
+        normalized_updates = self.normalize_work_order_updates(updates)
         await ref.update(normalized_updates)
         updated_doc = await ref.get()
         return WorkOrder(**updated_doc.to_dict())
@@ -162,7 +127,7 @@ class FirestoreEAM(EAMService):
     async def get_work_orders(
         self,
         asset_id: str = "",
-        status: Optional[WorkOrderStatus] = None,
+        status: WorkOrderStatus | None = None,
     ) -> list[WorkOrder]:
         ref = self.db.collection("work_orders")
         if asset_id:
@@ -181,7 +146,7 @@ class FirestoreEAM(EAMService):
         q: str = "",
         priority: str = "",
         department: str = "",
-        status: Optional[WorkOrderStatus] = None,
+        status: WorkOrderStatus | None = None,
         location: str = "",
     ) -> list[WorkOrder]:
         ref = self.db.collection("work_orders")
@@ -190,37 +155,25 @@ class FirestoreEAM(EAMService):
         if priority:
             ref = ref.where(filter=firestore.FieldFilter("priority", "==", priority.upper()))
 
-        # Pre-resolve location/department to asset_id sets
+        # Pre-resolve location/department to asset_id sets via shared helper
         location_asset_ids: set[str] | None = None
         dept_asset_ids: set[str] | None = None
         if location or department:
             asset_ref = self.db.collection("assets")
             if department:
-                asset_ref = asset_ref.where(filter=firestore.FieldFilter("department", "==", department))
-            asset_docs = asset_ref.stream()
-            loc_lower = location.lower() if location else ""
-            location_ids = set()
-            dept_ids = set()
-            async for doc in asset_docs:
-                a = doc.to_dict()
-                aid = a.get("asset_id", "")
-                if department:
-                    dept_ids.add(aid)
-                if location and loc_lower in a.get("location", {}).get("station", "").lower():
-                    location_ids.add(aid)
-                elif not location:
-                    location_ids.add(aid)
-            if location:
-                location_asset_ids = location_ids
-            if department:
-                dept_asset_ids = dept_ids
+                asset_ref = asset_ref.where(
+                    filter=firestore.FieldFilter("department", "==", department)
+                )
+            filter_assets = []
+            async for doc in asset_ref.stream():
+                filter_assets.append(doc.to_dict())
+            location_asset_ids, dept_asset_ids = self.resolve_location_dept_filters(
+                iter(filter_assets), location, department
+            )
 
         # Fetch all assets for joining/enriching the search results
-        # In a real system we would use more efficient joins/indices, but
-        # for synthetic data and small collections, this is robust.
         asset_map = {}
-        asset_docs = self.db.collection("assets").stream()
-        async for doc in asset_docs:
+        async for doc in self.db.collection("assets").stream():
             a = doc.to_dict()
             asset_map[a.get("asset_id", "")] = a
 
@@ -237,42 +190,17 @@ class FirestoreEAM(EAMService):
                 continue
 
             if q:
-                searchable = " ".join([
-                    wo.get("wo_id", ""),
-                    wo.get("description", ""),
-                    aid,
-                    asset.get("name", ""),
-                    asset.get("location", {}).get("station", ""),
-                    wo.get("problem_code", ""),
-                    wo.get("fault_code", ""),
-                    wo.get("action_code", ""),
-                    wo.get("assigned_to", ""),
-                ]).lower()
-                # Tokenized matching: all query words must appear
-                query_tokens = re.findall(r"[a-zA-Z0-9]+", q.lower())
-                if not all(token in searchable for token in query_tokens):
+                searchable = self.build_wo_searchable(wo, asset)
+                if not query_matches_text(q, searchable):
                     continue
             results.append(WorkOrder(**wo))
         return results
 
     async def get_locations(self) -> list[dict]:
-        docs = self.db.collection("assets").stream()
-        stations: dict[str, dict] = {}
-        async for doc in docs:
-            a = doc.to_dict()
-            loc = a.get("location", {})
-            station = loc.get("station", "")
-            if not station:
-                continue
-            if station not in stations:
-                stations[station] = {
-                    "station": station,
-                    "station_code": loc.get("station_code", ""),
-                    "zone": loc.get("zone", ""),
-                    "asset_count": 0,
-                }
-            stations[station]["asset_count"] += 1
-        return sorted(stations.values(), key=lambda s: s["station"])
+        assets = []
+        async for doc in self.db.collection("assets").stream():
+            assets.append(doc.to_dict())
+        return self.aggregate_stations(iter(assets))
 
     # --- EAM Code Operations ---
 
@@ -326,7 +254,9 @@ class FirestoreEAM(EAMService):
         except Exception as e:
             # Fallback for missing indices in production Cloud Firestore
             if "index" in str(e).lower() or "precondition" in str(e).lower() or "400" in str(e):
-                logger.warning(f"Inspection history index missing for {asset_id}, falling back to unordered search: {e}")
+                logger.warning(
+                    f"Inspection history index missing for {asset_id}, falling back to unordered search: {e}"
+                )
                 ref = (
                     self.db.collection("inspections")
                     .where(filter=firestore.FieldFilter("asset_id", "==", asset_id))
@@ -341,13 +271,6 @@ class FirestoreEAM(EAMService):
 
     # --- Knowledge Base ---
 
-    # Words that describe document type, not content — strip from KB queries
-    _KB_META_WORDS = frozenset({
-        "protocol", "procedure", "manual", "guide", "guidelines", "standard",
-        "standards", "document", "checklist", "instructions", "handbook",
-        "specification", "reference", "sop",
-    })
-
     async def search_knowledge_base(
         self, query: str, asset_type: str = "", department: str = ""
     ) -> list[KnowledgeBaseEntry]:
@@ -355,21 +278,17 @@ class FirestoreEAM(EAMService):
         if department:
             ref = ref.where(filter=firestore.FieldFilter("department", "==", department))
 
+        query_tokens = self.tokenize_kb_query(query) if query else []
+
         docs = ref.stream()
         results = []
-        # Robust tokenization
-        query_tokens = [
-            t for t in re.findall(r"[a-zA-Z0-9]+", query.lower())
-            if t not in self._KB_META_WORDS
-        ] if query else []
-        
         async for doc in docs:
             entry = KnowledgeBaseEntry(**doc.to_dict())
             if asset_type and asset_type not in entry.asset_types:
                 continue
             if query_tokens:
                 searchable = f"{entry.title} {entry.content} {' '.join(entry.tags)}".lower()
-                if not all(token in searchable for token in query_tokens):
+                if not self.kb_tokens_match(query_tokens, searchable):
                     continue
             results.append(entry)
         return results
@@ -382,13 +301,9 @@ class FirestoreEAM(EAMService):
             .document(correction.correction_id)
             .set(correction.model_dump())
         )
-        logger.info(
-            f"Logged correction: {correction.original_code} → {correction.corrected_code}"
-        )
+        logger.info(f"Logged correction: {correction.original_code} → {correction.corrected_code}")
 
-    async def get_corrections(
-        self, asset_id: str = "", code_type: str = ""
-    ) -> list[CorrectionLog]:
+    async def get_corrections(self, asset_id: str = "", code_type: str = "") -> list[CorrectionLog]:
         ref = self.db.collection("correction_log")
         if asset_id:
             ref = ref.where(filter=firestore.FieldFilter("asset_id", "==", asset_id))
@@ -403,7 +318,7 @@ class FirestoreEAM(EAMService):
 
 
 # Singleton instance
-_eam_service: Optional[EAMService] = None
+_eam_service: EAMService | None = None
 
 
 def _has_firestore_runtime() -> bool:

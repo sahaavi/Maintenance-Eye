@@ -7,13 +7,11 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import firebase_admin
-from firebase_admin import auth, credentials
-from fastapi import HTTPException, Request, WebSocket, status
-
 from config import settings
+from fastapi import HTTPException, Request, WebSocket, status
+from firebase_admin import auth, credentials
 
 logger = logging.getLogger("maintenance-eye.auth")
 
@@ -22,7 +20,7 @@ logger = logging.getLogger("maintenance-eye.auth")
 class AuthContext:
     uid: str
     email: str = ""
-    claims: Optional[dict] = None
+    claims: dict | None = None
 
 
 def _initialize_firebase() -> bool:
@@ -44,7 +42,7 @@ def _initialize_firebase() -> bool:
         return False
 
 
-def _extract_bearer_token(authorization_header: str) -> Optional[str]:
+def _extract_bearer_token(authorization_header: str) -> str | None:
     if not authorization_header:
         return None
     if not authorization_header.lower().startswith("bearer "):
@@ -88,7 +86,7 @@ async def require_auth_http(request: Request) -> AuthContext:
         )
 
 
-async def require_auth_websocket(websocket: WebSocket) -> Optional[AuthContext]:
+async def require_auth_websocket(websocket: WebSocket) -> AuthContext | None:
     """
     Validate auth for WebSocket sessions.
     Token is accepted via Authorization header or ?token= query param.

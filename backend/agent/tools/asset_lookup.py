@@ -15,6 +15,7 @@ _engine = QueryEngine()
 
 from agent.tools.wrapper import tool_wrapper
 
+
 @tool_wrapper
 async def lookup_asset(
     query: str = "",
@@ -25,8 +26,7 @@ async def lookup_asset(
 ) -> dict:
     """
     Look up a maintenance asset by its ID, name, location, or department.
-    Use this tool when the technician mentions a specific piece of equipment,
-    a station name, or an asset code.
+    Use this tool when the technician mentions a specific piece of equipment, a station name, or an asset code.
 
     The query supports partial word matching — each word in the query is matched
     independently against asset name, ID, type, department, station, manufacturer,
@@ -60,17 +60,53 @@ async def lookup_asset(
                 normalized = QueryEngine.normalize_asset_id(asset_id)
                 if normalized and normalized != asset_id:
                     asset = await eam.get_asset(normalized)
+
             if asset:
                 return {
                     "found": True,
                     "count": 1,
                     "assets": [asset.model_dump()],
                 }
-            return {"found": False, "count": 0, "assets": [], "message": f"No asset found with ID: {asset_id}"}
+
+            # No exact/normalized match -> try to suggest candidates
+            suggestions = await _engine.suggest_asset_candidates(asset_id, eam, limit=3)
+
+            if suggestions:
+                return {
+                    "found": False,
+                    "count": 0,
+                    "needs_asset_confirmation": True,
+                    "guessed_assets": suggestions,
+                    "message": f"No asset found with ID: {asset_id}. Did you mean {', '.join(s['asset_id'] for s in suggestions)}?",
+                }
+
+            return {
+                "found": False,
+                "count": 0,
+                "assets": [],
+                "message": f"No asset found with ID: {asset_id}",
+            }
 
         # Normalize query terms and resolve aliases
         if query:
             parsed = _engine.build_query(query)
+            # Direct lookup for extracted IDs (e.g., "TC-138-PROP", "ESC-SC-003")
+            extracted_assets = []
+            seen_asset_ids: set[str] = set()
+            for eid in parsed.extracted_ids:
+                if eid.upper().startswith("WO-"):
+                    continue
+                asset = await eam.get_asset(eid.upper())
+                if asset and asset.asset_id not in seen_asset_ids:
+                    extracted_assets.append(asset)
+                    seen_asset_ids.add(asset.asset_id)
+            if extracted_assets:
+                return {
+                    "found": True,
+                    "count": len(extracted_assets),
+                    "assets": [a.model_dump() for a in extracted_assets[:10]],
+                }
+
             if parsed.filters.get("department") and not department:
                 department = parsed.filters["department"]
             if parsed.filters.get("asset_type") and not asset_type:
@@ -85,6 +121,10 @@ async def lookup_asset(
             station=station,
             asset_type=asset_type,
         )
+        if not assets and (department or station or asset_type):
+            # Fallback with relaxed filters when NLP-derived filters over-constrain
+            # subsystem queries (e.g., train_car + propulsion).
+            assets = await eam.search_assets(query=query)
         return {
             "found": len(assets) > 0,
             "count": len(assets),

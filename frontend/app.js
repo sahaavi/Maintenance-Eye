@@ -424,10 +424,7 @@ function handleServerMessage(msg) {
 
 // ==================== CONFIRMATION UI ====================
 
-function renderConfirmationCard(actionData) {
-    const container = el.confirmationContainer();
-    if (!container) return;
-
+function _buildConfirmationCard(actionData, { idPrefix, onConfirm, onReject, onCorrect }) {
     const prompt = actionData.confirmation_prompt || actionData;
     const actionId = actionData.action_id;
     const actionType = prompt.action_type || 'action';
@@ -439,7 +436,7 @@ function renderConfirmationCard(actionData) {
 
     const card = document.createElement('div');
     card.className = 'confirmation-card';
-    card.id = `confirm-${actionId}`;
+    card.id = `${idPrefix}${actionId}`;
 
     const header = document.createElement('div');
     header.className = 'confirm-header';
@@ -472,18 +469,18 @@ function renderConfirmationCard(actionData) {
 
     const confirmBtn = document.createElement('button');
     confirmBtn.className = 'confirm-btn confirm-yes';
-    confirmBtn.textContent = '✅ Confirm';
-    confirmBtn.addEventListener('click', () => confirmAction(actionId));
+    confirmBtn.textContent = 'Confirm';
+    confirmBtn.addEventListener('click', () => onConfirm(actionId));
 
     const rejectBtn = document.createElement('button');
     rejectBtn.className = 'confirm-btn confirm-no';
-    rejectBtn.textContent = '❌ Reject';
-    rejectBtn.addEventListener('click', () => rejectAction(actionId));
+    rejectBtn.textContent = 'Reject';
+    rejectBtn.addEventListener('click', () => onReject(actionId));
 
     const correctBtn = document.createElement('button');
     correctBtn.className = 'confirm-btn confirm-edit';
-    correctBtn.textContent = '✏️ Correct';
-    correctBtn.addEventListener('click', () => correctAction(actionId));
+    correctBtn.textContent = 'Correct';
+    correctBtn.addEventListener('click', () => onCorrect(actionId));
 
     actions.appendChild(confirmBtn);
     actions.appendChild(rejectBtn);
@@ -498,6 +495,19 @@ function renderConfirmationCard(actionData) {
         card.appendChild(codesEl);
     }
     card.appendChild(actions);
+    return { card, description };
+}
+
+function renderConfirmationCard(actionData) {
+    const container = el.confirmationContainer();
+    if (!container) return;
+
+    const { card, description } = _buildConfirmationCard(actionData, {
+        idPrefix: 'confirm-',
+        onConfirm: confirmAction,
+        onReject: rejectAction,
+        onCorrect: correctAction,
+    });
 
     container.prepend(card);
     // Auto-expand panel
@@ -762,9 +772,10 @@ function addAgentMessage(text) {
     const container = el.agentMessages();
     const div = document.createElement('div');
     div.className = 'message agent-message fade-in';
-    const p = document.createElement('p');
-    p.textContent = text;
-    div.appendChild(p);
+    const content = document.createElement('div');
+    content.className = 'markdown-content';
+    content.innerHTML = renderMarkdown(text);
+    div.appendChild(content);
     container.appendChild(div);
     trimMessageHistory();
     container.scrollTop = container.scrollHeight;
@@ -799,7 +810,12 @@ function addTranscript(speaker, text) {
         div.appendChild(speakerEl);
         const textNode = document.createElement('span');
         textNode.className = 'transcript-text';
-        textNode.textContent = ` ${text}`;
+        textNode.dataset.rawText = text;
+        if (speaker === 'You') {
+            textNode.textContent = ` ${text}`;
+        } else {
+            textNode.innerHTML = renderMarkdown(text);
+        }
         div.appendChild(textNode);
         container.appendChild(div);
         state.currentTranscriptEl = div;
@@ -808,7 +824,14 @@ function addTranscript(speaker, text) {
         // Append to existing bubble
         const textSpan = state.currentTranscriptEl.querySelector('.transcript-text');
         if (textSpan) {
-            textSpan.textContent += ` ${text}`;
+            const current = textSpan.dataset.rawText || '';
+            const next = current ? `${current} ${text}` : text;
+            textSpan.dataset.rawText = next;
+            if (speaker === 'You') {
+                textSpan.textContent = ` ${next}`;
+            } else {
+                textSpan.innerHTML = renderMarkdown(next);
+            }
         }
     }
 
@@ -901,7 +924,7 @@ function updateConnectionStatus(connected) {
         statusEl.querySelector('span:last-child').textContent = 'Connected to Max';
     } else {
         statusEl.classList.remove('connected');
-        statusEl.querySelector('span:last-child').textContent = 'Disconnected';
+        statusEl.querySelector('span:last-child').textContent = 'Ready to connect';
     }
 }
 
@@ -980,6 +1003,7 @@ function connectChatWebSocket() {
         console.log('[Chat WS] Connected');
         chatState.isConnected = true;
         setChatStatus('Online');
+        updateConnectionStatus(true);
     };
 
     chatState.ws.onmessage = (event) => {
@@ -995,6 +1019,7 @@ function connectChatWebSocket() {
         console.log('[Chat WS] Disconnected');
         chatState.isConnected = false;
         setChatStatus('Offline');
+        updateConnectionStatus(false);
     };
 
     chatState.ws.onerror = (err) => {
@@ -1015,6 +1040,7 @@ function disconnectChat() {
         chatState.ws = null;
     }
     chatState.isConnected = false;
+    updateConnectionStatus(false);
 }
 
 function handleChatServerMessage(msg) {
@@ -1236,9 +1262,14 @@ function addChatMessage(role, text) {
         div.className = 'message transcript transcript-agent fade-in';
     }
 
-    const p = document.createElement('p');
-    p.textContent = text;
-    div.appendChild(p);
+    const content = document.createElement('div');
+    content.className = 'markdown-content';
+    if (role === 'agent' || role === 'agent-transcript') {
+        content.innerHTML = renderMarkdown(text);
+    } else {
+        content.textContent = text;
+    }
+    div.appendChild(content);
     container.appendChild(div);
 
     while (container.childElementCount > MAX_MESSAGE_ITEMS) {
@@ -1258,78 +1289,14 @@ function renderChatConfirmationCard(actionData) {
     const container = document.getElementById('chat-confirmation-container');
     if (!container) return;
 
-    const prompt = actionData.confirmation_prompt || actionData;
-    const actionId = actionData.action_id;
-    const actionType = prompt.action_type || 'action';
-    const description = prompt.description || prompt.message || '';
-    const priority = prompt.priority || '';
-    const confidence = prompt.confidence || '';
-    const codes = prompt.codes || '';
-    const priorityClass = /^P[1-5]$/.test(priority) ? priority : '';
+    const { card, description } = _buildConfirmationCard(actionData, {
+        idPrefix: 'chat-confirm-',
+        onConfirm: chatConfirmAction,
+        onReject: chatRejectAction,
+        onCorrect: chatCorrectAction,
+    });
 
-    const card = document.createElement('div');
-    card.className = 'confirmation-card';
-    card.id = `chat-confirm-${actionId}`;
-
-    const header = document.createElement('div');
-    header.className = 'confirm-header';
-
-    const badge = document.createElement('span');
-    badge.className = 'confirm-badge';
-    badge.textContent = formatActionType(actionType);
-    header.appendChild(badge);
-
-    if (priority) {
-        const priorityEl = document.createElement('span');
-        priorityEl.className = `confirm-priority${priorityClass ? ` ${priorityClass}` : ''}`;
-        priorityEl.textContent = priority;
-        header.appendChild(priorityEl);
-    }
-
-    if (confidence) {
-        const confidenceEl = document.createElement('span');
-        confidenceEl.className = 'confirm-confidence';
-        confidenceEl.textContent = confidence;
-        header.appendChild(confidenceEl);
-    }
-
-    const descEl = document.createElement('p');
-    descEl.className = 'confirm-description';
-    descEl.textContent = description;
-
-    const actions = document.createElement('div');
-    actions.className = 'confirm-actions';
-
-    const confirmBtn = document.createElement('button');
-    confirmBtn.className = 'confirm-btn confirm-yes';
-    confirmBtn.textContent = 'Confirm';
-    confirmBtn.addEventListener('click', () => chatConfirmAction(actionId));
-
-    const rejectBtn = document.createElement('button');
-    rejectBtn.className = 'confirm-btn confirm-no';
-    rejectBtn.textContent = 'Reject';
-    rejectBtn.addEventListener('click', () => chatRejectAction(actionId));
-
-    const correctBtn = document.createElement('button');
-    correctBtn.className = 'confirm-btn confirm-edit';
-    correctBtn.textContent = 'Correct';
-    correctBtn.addEventListener('click', () => chatCorrectAction(actionId));
-
-    actions.appendChild(confirmBtn);
-    actions.appendChild(rejectBtn);
-    actions.appendChild(correctBtn);
-
-    card.appendChild(header);
-    card.appendChild(descEl);
-    if (codes) {
-        const codesEl = document.createElement('p');
-        codesEl.className = 'confirm-codes';
-        codesEl.textContent = codes;
-        card.appendChild(codesEl);
-    }
-    card.appendChild(actions);
     container.prepend(card);
-
     addChatMessage('agent', `Action proposed: ${description}`);
 }
 
@@ -1487,6 +1454,91 @@ function escapeHtml(str) {
     return d.innerHTML;
 }
 
+function renderInlineMarkdown(text) {
+    return text
+        .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*([^*\n]+)\*/g, (match, inner) => {
+            // Treat `*text*` as italic only when stars touch content.
+            if (inner.startsWith(' ') || inner.endsWith(' ')) {
+                return match;
+            }
+            return `<em>${inner}</em>`;
+        });
+}
+
+function normalizeMarkdownBlocks(text) {
+    return text
+        // Split inline bullets into real lines so list parsing works.
+        .replace(/([:;.!?)])\s+([*-]\s+(?=\S))/g, '$1\n$2')
+        // Same for numbered list markers emitted inline.
+        .replace(/([:;.!?)])\s+(\d+\.\s+(?=\S))/g, '$1\n$2');
+}
+
+function renderMarkdown(text) {
+    if (!text) return '';
+
+    const safe = normalizeMarkdownBlocks(
+        escapeHtml(String(text)).replace(/\r\n/g, '\n')
+    );
+    const lines = safe.split('\n');
+    const html = [];
+    let inUnorderedList = false;
+    let inOrderedList = false;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        const unorderedListMatch = trimmed.match(/^[-*]\s+(.+)$/);
+        const orderedListMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+
+        if (unorderedListMatch) {
+            if (inOrderedList) {
+                html.push('</ol>');
+                inOrderedList = false;
+            }
+            if (!inUnorderedList) {
+                html.push('<ul>');
+                inUnorderedList = true;
+            }
+            html.push(`<li>${renderInlineMarkdown(unorderedListMatch[1])}</li>`);
+            continue;
+        }
+
+        if (orderedListMatch) {
+            if (inUnorderedList) {
+                html.push('</ul>');
+                inUnorderedList = false;
+            }
+            if (!inOrderedList) {
+                html.push('<ol>');
+                inOrderedList = true;
+            }
+            html.push(`<li>${renderInlineMarkdown(orderedListMatch[1])}</li>`);
+            continue;
+        }
+
+        if (inUnorderedList) {
+            html.push('</ul>');
+            inUnorderedList = false;
+        }
+        if (inOrderedList) {
+            html.push('</ol>');
+            inOrderedList = false;
+        }
+
+        if (!trimmed) continue;
+        html.push(`<p>${renderInlineMarkdown(trimmed)}</p>`);
+    }
+
+    if (inUnorderedList) {
+        html.push('</ul>');
+    }
+    if (inOrderedList) {
+        html.push('</ol>');
+    }
+
+    return html.join('');
+}
+
 function formatLabel(str) {
     if (!str) return '';
     return String(str).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -1600,36 +1652,38 @@ function debouncePageSearch(page) {
     }, 300);
 }
 
-// --- Work Orders ---
+// --- Generic page data loader ---
 
-async function loadWorkOrders() {
-    const pageId = 'page-work-orders';
+async function loadPageData(pageId, endpoint, getFilters, renderFn, postFilter) {
     showPageState(pageId, 'loading');
-
     try {
-        const q = (document.getElementById('wo-search')?.value || '').trim();
-        const status = document.getElementById('wo-filter-status')?.value || '';
-        const priority = document.getElementById('wo-filter-priority')?.value || '';
-        const department = document.getElementById('wo-filter-department')?.value || '';
-        const location = document.getElementById('wo-filter-location')?.value || '';
-
         const params = new URLSearchParams();
-        if (q) params.set('q', q);
-        if (status) params.set('status', status);
-        if (priority) params.set('priority', priority);
-        if (department) params.set('department', department);
-        if (location) params.set('location', location);
-
-        const data = await apiFetch(`/api/work-orders?${params}`);
-        const items = Array.isArray(data) ? data : [];
+        const filters = getFilters();
+        for (const [key, val] of Object.entries(filters)) {
+            if (val) params.set(key, val);
+        }
+        const data = await apiFetch(`${endpoint}?${params}`);
+        let items = Array.isArray(data) ? data : [];
+        if (postFilter) items = postFilter(items);
         if (items.length === 0) { showPageState(pageId, 'empty'); return; }
-
-        renderWorkOrderTable(items);
+        renderFn(items);
         showPageState(pageId, 'data');
     } catch (err) {
         showPageState(pageId, 'empty');
-        console.error('Error loading work orders:', err);
+        console.error(`Error loading ${pageId}:`, err);
     }
+}
+
+// --- Work Orders ---
+
+function loadWorkOrders() {
+    loadPageData('page-work-orders', '/api/work-orders', () => ({
+        q: (document.getElementById('wo-search')?.value || '').trim(),
+        status: document.getElementById('wo-filter-status')?.value || '',
+        priority: document.getElementById('wo-filter-priority')?.value || '',
+        department: document.getElementById('wo-filter-department')?.value || '',
+        location: document.getElementById('wo-filter-location')?.value || '',
+    }), renderWorkOrderTable);
 }
 
 function renderWorkOrderTable(orders) {
@@ -1654,32 +1708,13 @@ function renderWorkOrderTable(orders) {
 
 // --- Assets ---
 
-async function loadAssets() {
-    const pageId = 'page-assets';
-    showPageState(pageId, 'loading');
-
-    try {
-        const q = (document.getElementById('asset-search')?.value || '').trim();
-        const department = document.getElementById('asset-filter-department')?.value || '';
-        const assetType = document.getElementById('asset-filter-type')?.value || '';
-        const station = document.getElementById('asset-filter-station')?.value || '';
-
-        const params = new URLSearchParams();
-        if (q) params.set('q', q);
-        if (department) params.set('department', department);
-        if (assetType) params.set('asset_type', assetType);
-        if (station) params.set('station', station);
-
-        const data = await apiFetch(`/api/assets?${params}`);
-        const items = Array.isArray(data) ? data : [];
-        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
-
-        renderAssetsGrid(items);
-        showPageState(pageId, 'data');
-    } catch (err) {
-        showPageState(pageId, 'empty');
-        console.error('Error loading assets:', err);
-    }
+function loadAssets() {
+    loadPageData('page-assets', '/api/assets', () => ({
+        q: (document.getElementById('asset-search')?.value || '').trim(),
+        department: document.getElementById('asset-filter-department')?.value || '',
+        asset_type: document.getElementById('asset-filter-type')?.value || '',
+        station: document.getElementById('asset-filter-station')?.value || '',
+    }), renderAssetsGrid);
 }
 
 function renderAssetsGrid(assets) {
@@ -1708,21 +1743,8 @@ function renderAssetsGrid(assets) {
 
 // --- Locations ---
 
-async function loadLocations() {
-    const pageId = 'page-locations';
-    showPageState(pageId, 'loading');
-
-    try {
-        const data = await apiFetch('/api/locations');
-        const items = Array.isArray(data) ? data : [];
-        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
-
-        renderLocationsPage(items);
-        showPageState(pageId, 'data');
-    } catch (err) {
-        showPageState(pageId, 'empty');
-        console.error('Error loading locations:', err);
-    }
+function loadLocations() {
+    loadPageData('page-locations', '/api/locations', () => ({}), renderLocationsPage);
 }
 
 function renderLocationsPage(locations) {
@@ -1759,28 +1781,11 @@ function renderLocationsPage(locations) {
 
 // --- Knowledge Base ---
 
-async function loadKnowledge() {
-    const pageId = 'page-knowledge';
-    showPageState(pageId, 'loading');
-
-    try {
-        const q = (document.getElementById('kb-search')?.value || '').trim();
-        const department = document.getElementById('kb-filter-department')?.value || '';
-
-        const params = new URLSearchParams();
-        params.set('q', q || 'maintenance');
-        if (department) params.set('department', department);
-
-        const data = await apiFetch(`/api/knowledge?${params}`);
-        const items = Array.isArray(data) ? data : [];
-        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
-
-        renderKnowledgeGrid(items);
-        showPageState(pageId, 'data');
-    } catch (err) {
-        showPageState(pageId, 'empty');
-        console.error('Error loading knowledge:', err);
-    }
+function loadKnowledge() {
+    loadPageData('page-knowledge', '/api/knowledge', () => ({
+        q: (document.getElementById('kb-search')?.value || '').trim() || 'maintenance',
+        department: document.getElementById('kb-filter-department')?.value || '',
+    }), renderKnowledgeGrid);
 }
 
 function renderKnowledgeGrid(entries) {
@@ -1807,40 +1812,19 @@ function renderKnowledgeGrid(entries) {
 
 // --- EAM Codes ---
 
-async function loadEAMCodes() {
-    const pageId = 'page-eam-codes';
-    showPageState(pageId, 'loading');
-
-    try {
-        const q = (document.getElementById('eam-search')?.value || '').trim();
-        const codeType = document.getElementById('eam-filter-type')?.value || '';
-        const department = document.getElementById('eam-filter-department')?.value || '';
-
-        const params = new URLSearchParams();
-        if (codeType) params.set('code_type', codeType);
-        if (department) params.set('department', department);
-
-        const data = await apiFetch(`/api/eam-codes?${params}`);
-        let items = Array.isArray(data) ? data : [];
-
-        // Client-side text filter
-        if (q) {
-            const ql = q.toLowerCase();
-            items = items.filter(c =>
-                (c.code || '').toLowerCase().includes(ql) ||
-                (c.description || '').toLowerCase().includes(ql) ||
-                (c.code_type || '').toLowerCase().includes(ql)
-            );
-        }
-
-        if (items.length === 0) { showPageState(pageId, 'empty'); return; }
-
-        renderEAMCodesTable(items);
-        showPageState(pageId, 'data');
-    } catch (err) {
-        showPageState(pageId, 'empty');
-        console.error('Error loading EAM codes:', err);
-    }
+function loadEAMCodes() {
+    const q = (document.getElementById('eam-search')?.value || '').trim();
+    loadPageData('page-eam-codes', '/api/eam-codes', () => ({
+        code_type: document.getElementById('eam-filter-type')?.value || '',
+        department: document.getElementById('eam-filter-department')?.value || '',
+    }), renderEAMCodesTable, q ? (items) => {
+        const ql = q.toLowerCase();
+        return items.filter(c =>
+            (c.code || '').toLowerCase().includes(ql) ||
+            (c.description || '').toLowerCase().includes(ql) ||
+            (c.code_type || '').toLowerCase().includes(ql)
+        );
+    } : null);
 }
 
 function renderEAMCodesTable(codes) {

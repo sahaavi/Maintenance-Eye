@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import pytest
-
 from api.websocket import (  # type: ignore[import-not-found]
-    _execute_confirmed_action,
     _decode_additional_data,
+    _execute_confirmed_action,
     _extract_confirmation_request,
     _extract_media_cards,
 )
-from services.confirmation_manager import ActionType, PendingAction  # type: ignore[import-not-found]
+from services.confirmation_manager import (  # type: ignore[import-not-found]
+    ActionType,
+    PendingAction,
+)
 
 
 def test_extract_confirmation_request_finds_nested_payload() -> None:
@@ -51,6 +53,27 @@ def test_extract_media_cards_supports_asset_and_kb_shapes() -> None:
     assert len(cards) == 2
     assert cards[0]["title"] == "Procedure"
     assert cards[1]["title"].startswith("Asset:")
+
+
+def test_extract_media_cards_supports_work_order_and_zero_result_summary() -> None:
+    payload = {
+        "intent": "work_order",
+        "total": 0,
+        "results": [],
+        "search_metadata": {"raw_input": "open wo for train car 138 propulsion"},
+        "extra": {
+            "wo_id": "WO-2026-0166",
+            "asset_id": "TC-138-PROP",
+            "status": "open",
+            "priority": "P2",
+            "description": "Propulsion PCU fault",
+        },
+    }
+
+    cards = _extract_media_cards(payload)
+    assert len(cards) == 2
+    assert cards[0]["title"] == "No Matching Records"
+    assert cards[1]["title"] == "Work Order: WO-2026-0166"
 
 
 @pytest.mark.asyncio

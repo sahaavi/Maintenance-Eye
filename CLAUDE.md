@@ -31,19 +31,19 @@ Path convention:
 
 ```bash
 # Backend setup
-cd backend && python -m venv venv && source venv/bin/activate
+cd backend && python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 
 # Run backend (serves frontend static files too)
-python main.py                    # http://localhost:8080
+python3 main.py                   # http://localhost:8080
 
 # Run with Firestore emulator (local dev)
 firebase emulators:start          # Firestore @ localhost:8081
-FIRESTORE_EMULATOR_HOST=localhost:8081 python main.py
+FIRESTORE_EMULATOR_HOST=localhost:8081 python3 main.py
 
 # Seed synthetic data to Firestore
 ./scripts/setup_and_seed.sh
-python scripts/seed_data.py
+python3 scripts/seed_data.py
 
 # Deploy to GCP
 ./scripts/deploy.sh <project-id> <gemini-api-key> [region]
@@ -60,10 +60,13 @@ source .venv/bin/activate
 TEST_ENV=dev ./scripts/run_test_suite.sh
 
 # Run layered suites directly
-python -m pytest -m "unit or integration or api"
-python -m pytest -m "security or ai or data"
-python -m pytest -m "performance"
-python -m pytest -m "e2e"
+python3 -m pytest -m "unit or integration or api"
+python3 -m pytest -m "security or ai or data"
+python3 -m pytest -m "performance"
+python3 -m pytest -m "e2e"
+
+# Run specific test files (bypasses global coverage gate)
+python3 -m pytest -o "addopts=" tests/unit/ -v
 ```
 
 CI pipeline: `.github/workflows/test-suite.yml` (quality, security, core pytest, and Playwright E2E jobs with artifact upload).
@@ -74,20 +77,22 @@ To maintain a consistent `BUG_REPORT.md` across all AI agents (Claude, Gemini, e
 
 ```bash
 # Add a new bug
-python scripts/manage_bugs.py add "Bug Description" --severity critical --component "Backend" --impact "Crashes on startup"
+python3 scripts/manage_bugs.py add "Bug Description" --severity critical --component "Backend" --impact "Crashes on startup"
 
 # Update bug status
-python scripts/manage_bugs.py update C-001 --status "Fixed"
+python3 scripts/manage_bugs.py update C-001 --status "Fixed"
 ```
 
 AI agents should run this script whenever they identify a new bug or resolve an existing one.
+
+**Known issue:** `manage_bugs.py` parsing may not align with current `BUG_REPORT.md` layout — always inspect `git diff` after running and revert if entries are incomplete.
 
 ## Architecture
 
 ```
 Phone PWA ──WebSocket──▶ FastAPI ──ADK Runner──▶ Gemini 2.5 Flash (Live API)
   (camera+mic)           │                          │
-                         │                     8 ADK Tools
+                         │                     9 ADK Tools
                          ▼                          │
                     REST API ◀──────────────────────▼
                          │                    Firestore (EAM data)
@@ -99,11 +104,15 @@ Phone PWA ──WebSocket──▶ FastAPI ──ADK Runner──▶ Gemini 2.5 
 - `main.py` — FastAPI app, ADK Runner init with `InMemorySessionService`, static file serving
 - `agent/maintenance_agent.py` — ADK Agent definition (model: `gemini-live-2.5-flash-native-audio`)
 - `agent/prompts.py` — System prompt defining "Max" persona, severity ratings, EAM code classification
-- `agent/tools/` — 8 tool functions (asset lookup, work orders, safety, reports, human-in-the-loop confirmation)
+- `agent/tools/` — 9 tool functions (smart search, asset lookup, work orders, safety, reports, human-in-the-loop confirmation)
 - `api/websocket.py` — Bidirectional WebSocket handler using ADK `LiveRequestQueue` for audio/video/text streaming
+- `api/websocket_helpers.py` — Confirmation execution, media card extraction helpers
 - `api/routes.py` — REST endpoints for assets, work orders, inspections, knowledge base, confirmation flow, reports
 - `services/eam_interface.py` — Abstract EAM service (pluggable: Firestore for hackathon, Hexagon EAM for production)
 - `services/firestore_eam.py` — Firestore async implementation
+- `services/base_eam.py` — Shared search helpers (searchable text construction, filter resolution, KB tokenization)
+- `services/query_engine.py` — NLP pre-query intelligence layer (intent detection, ID normalization, synonym expansion, caching)
+- `services/search_matcher.py` — Token-aware text matching with ASR domain corrections
 - `services/confirmation_manager.py` — Human-in-the-loop action tracking (propose → confirm/reject/correct)
 - `models/schemas.py` — Pydantic models (Asset, WorkOrder, EAMCode, InspectionRecord, etc.)
 
@@ -113,6 +122,8 @@ Phone PWA ──WebSocket──▶ FastAPI ──ADK Runner──▶ Gemini 2.5 
 - `style.css` — Enterprise dashboard styles: sidebar nav (desktop), bottom nav (mobile), filter bars, data tables, status/priority badges
 
 **Infrastructure**: Docker (Python 3.12-slim), Cloud Run (0-3 instances), Terraform, Cloud Build CI/CD.
+
+**Local dev note:** Running under WSL2 — no camera/mic hardware available. Full audio/video E2E testing requires a real device or Cloud Run deployment.
 
 ## Key Design Patterns
 
@@ -132,3 +143,4 @@ Environment variables loaded from `.env` via `backend/config.py`:
 - `GCP_PROJECT_ID`, `GEMINI_API_KEY`, `FIRESTORE_DATABASE`, `GCS_BUCKET`
 - `FIRESTORE_EMULATOR_HOST` — set for local dev with emulator
 - `APP_PORT` (default 8080), `APP_ENV`, `LOG_LEVEL`
+- **Warning:** `.env` uses CRLF line endings — do NOT `source .env` directly in bash. Use `grep`/`cut`/`tr -d '\r'` to extract values.

@@ -4,20 +4,18 @@ ADK root agent with tool bindings for maintenance inspection operations.
 """
 
 import logging
-from typing import Optional
 
-from google.adk.agents import Agent
-
-from config import settings
-from agent.prompts import SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT, AGENT_NAME
+from agent.prompts import AGENT_NAME, CHAT_SYSTEM_PROMPT, SYSTEM_PROMPT
 from agent.tools.asset_lookup import lookup_asset
+from agent.tools.confirm_action import check_pending_actions, propose_action
 from agent.tools.inspection_history import get_inspection_history
 from agent.tools.knowledge_search import search_knowledge_base
-from agent.tools.work_order import manage_work_order
-from agent.tools.safety_protocol import get_safety_protocol
 from agent.tools.report_generator import generate_report
-from agent.tools.confirm_action import propose_action, check_pending_actions
+from agent.tools.safety_protocol import get_safety_protocol
 from agent.tools.smart_search import smart_search
+from agent.tools.work_order import manage_work_order
+from config import settings
+from google.adk.agents import Agent
 
 logger = logging.getLogger("maintenance-eye.agent")
 
@@ -97,4 +95,3 @@ def create_chat_agent() -> Agent:
 # Module-level agent instances — used by Runners in main.py
 maintenance_agent = create_maintenance_agent()
 chat_agent = create_chat_agent()
-

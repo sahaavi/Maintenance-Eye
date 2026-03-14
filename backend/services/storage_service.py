@@ -6,11 +6,9 @@ Lightweight wrapper for uploading media/report artifacts to GCS.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
-
-from google.cloud import storage
 
 from config import settings
+from google.cloud import storage
 
 logger = logging.getLogger("maintenance-eye.storage")
 
@@ -21,7 +19,7 @@ class StorageService:
     def __init__(self):
         self.bucket_name = (settings.GCS_BUCKET or "").strip()
         self.project_id = settings.GCP_PROJECT_ID
-        self._client: Optional[storage.Client] = None
+        self._client: storage.Client | None = None
         self._bucket = None
 
     @property
@@ -41,7 +39,7 @@ class StorageService:
         data: bytes,
         object_path: str,
         content_type: str,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Upload raw bytes to GCS and return gs:// URI."""
         if not self.enabled:
             return None
@@ -58,7 +56,7 @@ class StorageService:
             logger.debug(f"GCS upload skipped for {object_path}: {exc}")
             return None
 
-    async def upload_json(self, payload: dict, object_path: str) -> Optional[str]:
+    async def upload_json(self, payload: dict, object_path: str) -> str | None:
         """Upload JSON document to GCS and return gs:// URI."""
         import json
 
@@ -74,7 +72,7 @@ class StorageService:
         return f"reports/{ts}/{report_id}.json"
 
 
-_storage_service: Optional[StorageService] = None
+_storage_service: StorageService | None = None
 
 
 def get_storage_service() -> StorageService:

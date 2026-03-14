@@ -12,6 +12,7 @@ logger = logging.getLogger("maintenance-eye.tools.knowledge")
 
 from agent.tools.wrapper import tool_wrapper
 
+
 @tool_wrapper
 async def search_knowledge_base(
     query: str,

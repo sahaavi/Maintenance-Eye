@@ -1,5 +1,114 @@
 # Lessons Learned — Maintenance-Eye
 
+## 2026-03-05 - Multi-Word Asset Types Must Suppress Conflicting Department Filters
+
+**Context:** Query "open work order for Metrotown Track Circuit 3" returned 0 results despite WO-2025-0006 existing. The word "track" triggered `department=guideway` via `DEPARTMENT_ALIASES`, while "track circuit" also set `asset_type=track_circuit`. Both filters applied independently, but TRC-MT-003 is `department=signal_telecom`, so the guideway filter excluded it.
+
+**Root Cause:** `_extract_filters()` applied department and asset_type detection independently. When a word (e.g., "track") appeared in both a multi-word asset_type phrase ("track circuit") and the department alias map, it created conflicting filters.
+
+**Solution:** After asset_type extraction, collect the constituent words of matched multi-word phrases. During department single-token matching, if the matched department token is part of an asset_type phrase, remove the department filter to avoid the conflict.
+
+**Rule:** When NLP filter extraction detects both department and asset_type from overlapping tokens, the more specific filter (asset_type from a multi-word phrase) must win. Never let a single word simultaneously drive two conflicting filters.
+
+## 2026-03-05 - Compound-Word Matching Handles ASR Name Splitting
+
+**Context:** "Metro Town" (2 words from ASR) vs "Metrotown" (1 word in DB). The token "metro" matched via prefix, but "town" had no match — AND-logic failed the entire query.
+
+**Root Cause:** `query_matches_text()` only tried individual token matching. When ASR splits a compound proper noun into parts, each part may not independently match any searchable token.
+
+**Solution:** Added a compound-word pass in `query_matches_text()`: for unmatched alpha tokens, try concatenating with the adjacent token (including previously matched ones). If the compound matches a searchable token exactly or via prefix, both tokens are marked matched. Also added bigram-based fuzzy matching (Dice coefficient >= 0.6) as a last resort for ASR garbling (e.g., "downtrex" ≈ "downtown").
+
+**Rule:** Text matchers in speech-driven search must handle compound-word splitting. After individual token matching, try concatenating adjacent unmatched tokens before declaring no match. Add fuzzy fallback only for tokens >= 5 chars to avoid false positives.
+
+## 2026-03-05 - WO Search Needs Relaxed-Filter Fallback Like Asset Search
+
+**Context:** `_search_assets()` had a relaxed-filter fallback when NLP-derived filters over-constrained results, but `_search_work_orders()` had no equivalent — wrong department meant 0 results with no recovery.
+
+**Solution:** Added the same pattern to `_search_work_orders()`: when primary search returns 0 results AND filters were applied (department/location/priority), retry with just `q` + `status`. Score relaxed results slightly lower (-0.05).
+
+**Rule:** Every search function that accepts NLP-derived filters must have a relaxed-filter fallback. NLP filter extraction is inherently noisy — the fallback ensures users still get results when filters are wrong.
+
+## 2026-03-05 - Shared Base Class Eliminates EAM Search Duplication
+
+**Context:** `JsonEAM` and `FirestoreEAM` had near-identical implementations of searchable string construction (asset: 11-field join, WO: 10-field join), location/department filter resolution, station aggregation, and KB meta-word stripping — ~90 lines duplicated across both files.
+
+**Root Cause:** `BaseEAMService` was created but only contained `normalize_work_order_updates()`. All search logic was copy-pasted into each concrete implementation.
+
+**Solution:** Extended `BaseEAMService` with 6 shared static/class methods:
+- `build_asset_searchable(asset)` — 11-field searchable string
+- `build_wo_searchable(wo, asset)` — 10-field searchable string with null safety
+- `resolve_location_dept_filters(assets_iter, location, dept)` — returns asset_id sets
+- `aggregate_stations(assets_iter)` — station grouping with counts
+- `tokenize_kb_query(query)` — meta-word stripping for KB search
+- `kb_tokens_match(tokens, searchable)` — all-tokens-present check
+
+Both `JsonEAM` and `FirestoreEAM` now delegate to these shared methods.
+
+**Rule:** When two EAM backends share identical text-matching or aggregation logic, extract it to `BaseEAMService` as a static/classmethod. The concrete classes should only contain storage-specific operations (Firestore queries, in-memory dict access).
+
+## 2026-03-05 - ASR Domain Terms Need Explicit Correction Map
+
+**Context:** Speech-to-text garbles domain terms like "VOBC" into "V OBC", "OVC", "BOBC", etc. The `_detect_train_subsystem_suffix()` only checked exact `"vobc"` string, so ASR variants were never resolved to the correct subsystem suffix.
+
+**Root Cause:** No fuzzy/ASR correction step existed before ID extraction. The pipeline assumed clean text input.
+
+**Solution:**
+1. Added `_ASR_CORRECTIONS` map (sorted longest-key-first for greedy matching) applied at the top of `build_query()`, `_extract_ids()`, and `normalize_asset_id()`.
+2. Updated `_detect_train_subsystem_suffix()` and `_extract_spoken_tc_ids()` to check ASR variant tokens directly.
+3. Added ASR variant entries to `ASSET_TYPE_ALIASES` and `search_matcher.py` `_DOMAIN_CORRECTIONS`.
+
+**Durable Rule:** When adding new domain-specific terms, always add known ASR misrecognition variants to `_ASR_CORRECTIONS` and relevant alias maps.
+
+## 2026-03-05 - Optional Regex Groups Cause NoneType Crashes
+
+**Context:** `_ASSET_ID_PATTERN` has an optional station code group `(?:([A-Z]{2})[-\s])?`. When this group doesn't match, `m.group(2)` returns `None`. The code `m.group(2).upper()` crashed with `AttributeError: 'NoneType' object has no attribute 'upper'`.
+
+**Root Cause:** Pre-existing bug masked because the specific input patterns (like "tc-229") were never tested through this code path until ASR corrections made them possible.
+
+**Solution:** Guard against `None` group values before calling `.upper()` on optional regex groups.
+
+**Durable Rule:** Always check optional regex capture groups for `None` before calling methods on them.
+
+## 2026-03-05 - Pre-Resolve Asset IDs Before WO Search
+
+**Context:** When user says "work orders for RC 139", the system searched work orders with raw "RC-139" which doesn't exist as an asset. The suggestion flow only triggered AFTER the search returned 0 results, requiring an extra round-trip.
+
+**Root Cause:** `_search_work_orders()` used extracted IDs directly without verifying they correspond to real assets.
+
+**Solution:** Added pre-resolution step in `_search_work_orders()`: for each non-WO extracted ID, verify via `eam.get_asset()`, and if not found, use `suggest_asset_candidates()` to find high-confidence (>= 0.7) alternatives and substitute them into the search.
+
+**Durable Rule:** When search depends on entity references (like asset IDs in WO search), verify the referenced entities exist before searching, and auto-resolve when high-confidence alternatives are available.
+
+## 2026-03-05 - Zero-Result WO Search Must Distinguish "No Work Orders" vs "Wrong Asset ID"
+
+**Context:** User query `are there any work order for rc 139` returned zero results and the agent answered as if `RC-139` were a real asset, instead of asking for confirmation or correcting the ID.
+
+**Root Cause:** Search pipeline treated malformed ID text as generic tokens and returned an empty work-order list with no correction metadata. The agent had no structured signal that the asset hint itself might be invalid or close to a known ID.
+
+**Solution:**
+1. Added shorthand/malformed asset hint extraction (`RC-139`) and candidate mapping in `QueryEngine`.
+2. Added `suggest_asset_candidates()` scoring (number match + prefix similarity) to propose likely assets (for example, `TC-139`).
+3. Updated `manage_work_order(search)` and `smart_search` to emit:
+   - `needs_asset_confirmation` + `guessed_assets` when likely matches exist.
+   - `no_asset_match` when no asset corresponds to the hinted ID.
+4. Updated prompts so the agent must ask user confirmation on guessed assets before proceeding.
+
+**Rule:** For safety-critical maintenance search, a zero-result query with an ID-like hint must never be treated as definitive. Return explicit confirmation/no-match metadata so the agent can verify asset identity with the technician before concluding.
+
+## 2026-03-05 - Spoken/Transcribed Asset IDs Need Canonical Parsing Before Search
+
+**Context:** Users reported that chat/live search often missed asset IDs and related work orders. Deterministic probes showed failures for ASR-style phrasing such as `e s c s c 0 0 3`, `e s c dash s c dash zero zero three`, and `t c one three eight prop`.
+
+**Root Cause:** QueryEngine only recognized contiguous ID forms (`ESC-SC-003`, `esc sc 003`, `TC-138-PROP`). When ASR split IDs letter-by-letter or used spoken separators (`dash`) + number words, ID extraction failed. Search then fell back to tokenized AND matching where leftover single-digit fragments (`0`, `3`, `1`, `8`) became mandatory tokens, producing false "no results."
+
+**Solution:**
+1. Added spoken-ID parsing for letter-by-letter and dash-word forms in `QueryEngine`.
+2. Extended `normalize_asset_id()` to resolve spoken/transcribed formats.
+3. Added post-cleaning term pruning to remove digit-by-digit ASR artifacts once an asset ID is extracted.
+4. Added noise tokens for spoken punctuation words (`dash`, `hyphen`, `minus`, `number`) and regression tests across query engine + tool paths.
+
+**Rule:** In speech-driven maintenance workflows, never rely only on regex for contiguous IDs. Always normalize ASR-transcribed ID patterns (single-letter sequences, spoken separators, number words) to canonical IDs before text matching.
+
 ## 2026-03-02 - JsonEAM search_work_orders NoneType crash
 
 **Context:** WO-2026-0152 has `assigned_to: null` (unassigned). The `search_work_orders` method joins all WO fields for full-text search using `" ".join([...])`.
@@ -375,3 +484,117 @@ Also fixed `manage_work_order` search action which had department hardcoded to `
 **Solution:** Marked the tests as async (`@pytest.mark.asyncio`) so they execute inside an event loop.
 
 **Rule:** When testing wrapped sync tools that call `asyncio.create_task`, run tests in an async pytest context rather than plain synchronous test functions.
+
+## 2026-03-04 - Markdown Rendering Requires Safe HTML Conversion in Message UIs
+
+**Context:** Agent responses in live inspection and chat displayed raw markdown markers (`**`, `*`) instead of formatted output, reducing readability of severity labels and EAM code lists.
+
+**Root Cause:** Message rendering paths (`addAgentMessage`, `addChatMessage`, transcript updates) used `textContent`, which escapes markdown syntax as literal text.
+
+**Solution:** Added a constrained markdown renderer in `frontend/app.js` that first escapes HTML, then applies inline markdown (`**bold**`, `*italic*`) and line-based bullet list parsing (`-`/`*` list items). Wired assistant output paths to `innerHTML` from this renderer, while preserving plain `textContent` for user-entered text.
+
+**Rule:** If assistant text needs markdown formatting in the UI, never render raw model output with `textContent`; use a safe pipeline: escape HTML first, then transform allowed markdown syntax to HTML.
+
+## 2026-03-04 - Validate Maintenance Scripts Side Effects Before Keeping Output
+
+**Context:** Ran `scripts/manage_bugs.py add ...` while closing a frontend markdown rendering bug.
+
+**Root Cause:** Assumed the script would append a visible bug entry safely; in this repository state it produced an unintended metadata-only edit path and a non-actionable update attempt (`M-009` not found).
+
+**Solution:** Reverted `BUG_REPORT.md` fully to `HEAD` and kept this task scoped to the requested frontend fix.
+
+**Rule:** When using repository maintenance scripts during unrelated bug fixes, inspect `git diff` immediately and discard script side effects unless they are complete, correct, and in-scope for the user request.
+
+## 2026-03-04 - Inline Markdown Lists Need Pre-Normalization Before Rendering
+
+**Context:** Chat responses can include list markers inline in a single sentence (for example: `...: * **WO-1** ... * **WO-2** ...`) instead of line-separated markdown bullets.
+
+**Root Cause:** The markdown renderer only recognized list items when `*`/`-` started a new line. Inline bullet markers stayed inside one paragraph, and italic regex could partially consume `* ...` sequences, making output look bundled and hard to read.
+
+**Solution:** Added a markdown normalization step (`normalizeMarkdownBlocks`) that inserts line breaks before inline bullet/numbered markers after sentence punctuation, then parsed both unordered and ordered lists. Also tightened italic conversion so `* text` (bullet marker pattern) is not treated as emphasis.
+
+**Rule:** For assistant-rendered markdown in streaming/chat UIs, normalize compact inline list markers into line-delimited form before parsing markdown; otherwise bullet-heavy operational summaries will collapse into unreadable blocks.
+
+## 2026-03-04 - `manage_bugs.py` Is Not Compatible With Current `BUG_REPORT.md` Layout
+
+**Context:** Tried to log a newly resolved frontend readability bug with `python3 scripts/manage_bugs.py add ...` followed by `update ...`.
+
+**Root Cause:** The script reported `Added bug M-009`, but only edited aggregate metadata and could not find `M-009` on update (`Bug ID M-009 not found`). The current report structure is not reliably parseable by the script.
+
+**Solution:** Reverted all `BUG_REPORT.md` side effects to `HEAD` and kept the fix scoped to frontend rendering + workflow logs.
+
+**Rule:** Until `manage_bugs.py` parsing is aligned with `BUG_REPORT.md`, run it only with immediate diff inspection and revert output if it does not create/update concrete bug entries deterministically.
+
+## 2026-03-04 - Deployment Scripts Should Not `source` CRLF `.env` Files Directly
+
+**Context:** Running `set -a; source .env; ...` before deployment produced `$'\r': command not found` errors in this repository.
+
+**Root Cause:** `.env` uses CRLF line endings, so direct shell `source` parsing in bash treats carriage returns as command suffixes.
+
+**Solution:** Extract required values with `grep/cut/tr` and strip `\r` + quotes before invoking deployment scripts.
+
+**Rule:** For deployment automation, parse `.env` defensively (`tr -d '\\r"'`) instead of sourcing directly unless line endings are guaranteed LF-only.
+
+## 2026-03-04 - Cloud Deployment from Sandbox Requires Early Escalation
+
+**Context:** Initial deploy attempt failed at `gcloud config set project` with DNS/auth refresh errors in sandbox.
+
+**Root Cause:** Sandbox execution blocked outbound DNS/network required for OAuth token refresh and GCP API calls.
+
+**Solution:** Re-ran deployment with escalated permissions; Cloud Build and Terraform then completed successfully.
+
+**Rule:** Any command that performs live GCP deployment (`gcloud`, `terraform apply`, Cloud Build submit) should be escalated immediately when sandbox network restrictions are active.
+
+## 2026-03-04 - Natural-Language WO Queries Need Filler/Number Normalization + Token-Aware Matching
+
+**Context:** Queries like "is there any open work order for escalator three at Stadium Chinatown" intermittently returned no open work orders even though the correct equipment was recognized.
+
+**Root Cause:** Two combined failures:
+1. Query normalization left conversational filler words (`there`, `any`, `do`, `have`) as mandatory AND-match tokens.
+2. Spoken numbers (`three`) were not normalized to digits and single-digit terms were dropped.
+Additionally, Firestore WO search could crash when nullable fields (e.g., `assigned_to: null`) were concatenated for matching.
+
+**Solution:** 
+- Expanded QueryEngine noise terms and normalized number words to digits.
+- Preserved numeric single-character tokens in cleaned terms.
+- Added asset-ID extraction for spaced formats (`esc sc 003`).
+- Replaced substring matching with shared token-aware matcher (`query_matches_text`) in JsonEAM and FirestoreEAM, including numeric equivalence (`3`/`003`/`0003`).
+- Made Firestore WO searchable text null-safe with `or ""` fallbacks.
+
+**Rule:** For speech-driven enterprise search, never rely on raw substring AND matching. Always normalize conversational filler + spoken numbers first, then match against canonical tokens with numeric equivalence and null-safe field handling.
+
+## 2026-03-04 - Generic Asset-Type Filters Can Hide Train-Car Subsystems
+
+**Context:** User query "train car 138 propulsion" failed asset resolution even though `TC-138-PROP` exists, and follow-up WO queries incorrectly said no results.
+
+**Root Cause:** Filter extraction set `asset_type=train_car` from generic words ("train", "car"), which excluded subsystem assets (`type=propulsion`). QueryEngine also lacked `TC-*`/train-car phrase ID extraction and WO search only re-injected strict `XXX-YY-NNN` IDs.
+
+**Solution:**
+- Added train-car ID normalization/extraction (`train car 138` and `TC 138`) with subsystem suffix derivation (`PROP`, `VOBC`, `D1..D4`).
+- Added asset-type specificity ranking so subsystem types outrank generic `train_car` when both are present.
+- Allowed WO search token reinjection for all extracted non-WO IDs (including `TC-*`).
+- Added relaxed filter fallback for asset search and prompt guardrails to avoid claiming on-screen cards when result sets are empty.
+
+**Rule:** In hierarchical asset domains (vehicle -> subsystem), never let generic entity terms ("train car") hard-filter out subsystem queries ("propulsion", "VOBC", "door"). Resolve candidate IDs first, then filter.
+
+## 2026-03-04 - ID Regex Must Validate Prefix Whitelists to Avoid False Positives
+
+**Context:** Query "open work orders for tc-138-prop" briefly produced extracted ID `FOR-TC-138`.
+
+**Root Cause:** The generic `([A-Z]{2,3})-([A-Z]{2})-(\d+)` asset regex matched across natural-language tokens (`for tc 138`) without checking whether the prefix was a valid asset namespace.
+
+**Solution:** Applied prefix whitelist validation using known asset prefixes before accepting normalized IDs.
+
+**Rule:** Any broad ID regex used on natural-language text must validate matched prefixes against known namespaces; otherwise prepositions/stopwords can be misread as IDs.
+
+## 2026-03-04 - Side-Channel Cards Must Cover Work-Order and Zero-Result Search Shapes
+
+**Context:** User saw agent language implying data was available on screen, but no visible card appeared.
+
+**Root Cause:** `_extract_media_cards` only supported asset/KB/report payloads. Smart-search work-order payloads and zero-result responses produced no UI card at all.
+
+**Solution:** Added extraction rules for:
+- Work-order payloads (`wo_id`, `asset_id`, `description`) -> work-order media cards
+- Smart-search zero-result payloads (`intent`, `total=0`, `results=[]`) -> explicit "No Matching Records" card
+
+**Rule:** Any tool-result side channel used as user-facing evidence must include both positive-result and empty-result shapes for the major entities; otherwise users see silent blanks and lose trust.

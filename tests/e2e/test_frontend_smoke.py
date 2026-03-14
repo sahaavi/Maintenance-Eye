@@ -41,23 +41,27 @@ def page() -> Page:
 @pytest.mark.e2e
 @pytest.mark.slow
 def test_home_to_dashboard_navigation(page: Page, static_server: str) -> None:
-    mock_assets = [{
-        "asset_id": "AST-UNIT-001",
-        "name": "Signal Cabinet",
-        "department": "signal_telecom",
-        "type": "signal",
-        "location": {"station": "Main Station", "station_code": "MS", "zone": "Z1"},
-        "status": "operational",
-    }]
-    mock_work_orders = [{
-        "wo_id": "WO-2026-0001",
-        "priority": "P2",
-        "description": "Check bracket",
-        "asset_id": "AST-UNIT-001",
-        "status": "open",
-        "problem_code": "ME-003",
-        "created_at": "2026-03-02T00:00:00",
-    }]
+    mock_assets = [
+        {
+            "asset_id": "AST-UNIT-001",
+            "name": "Signal Cabinet",
+            "department": "signal_telecom",
+            "type": "signal",
+            "location": {"station": "Main Station", "station_code": "MS", "zone": "Z1"},
+            "status": "operational",
+        }
+    ]
+    mock_work_orders = [
+        {
+            "wo_id": "WO-2026-0001",
+            "priority": "P2",
+            "description": "Check bracket",
+            "asset_id": "AST-UNIT-001",
+            "status": "open",
+            "problem_code": "ME-003",
+            "created_at": "2026-03-02T00:00:00",
+        }
+    ]
 
     def fulfill_api(route):
         path = route.request.url
@@ -65,10 +69,25 @@ def test_home_to_dashboard_navigation(page: Page, static_server: str) -> None:
             route.fulfill(status=200, body=json.dumps(mock_assets), content_type="application/json")
             return
         if "/api/work-orders" in path:
-            route.fulfill(status=200, body=json.dumps(mock_work_orders), content_type="application/json")
+            route.fulfill(
+                status=200, body=json.dumps(mock_work_orders), content_type="application/json"
+            )
             return
         if "/api/locations" in path:
-            route.fulfill(status=200, body=json.dumps([{"station": "Main Station", "station_code": "MS", "zone": "Z1", "asset_count": 1}]), content_type="application/json")
+            route.fulfill(
+                status=200,
+                body=json.dumps(
+                    [
+                        {
+                            "station": "Main Station",
+                            "station_code": "MS",
+                            "zone": "Z1",
+                            "asset_count": 1,
+                        }
+                    ]
+                ),
+                content_type="application/json",
+            )
             return
         if "/api/knowledge" in path:
             route.fulfill(status=200, body=json.dumps([]), content_type="application/json")

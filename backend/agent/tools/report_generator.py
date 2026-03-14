@@ -21,6 +21,7 @@ def _status_value(status: object) -> str:
 
 from agent.tools.wrapper import tool_wrapper
 
+
 @tool_wrapper
 async def generate_report(
     asset_id: str,

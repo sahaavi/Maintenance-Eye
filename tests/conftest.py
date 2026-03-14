@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import pytest
 from fastapi import FastAPI
@@ -16,6 +16,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from api.routes import router as api_router  # type: ignore[import-not-found]
+
 from tests.fixtures.factories import FakeEAM
 
 
@@ -31,6 +32,26 @@ def _test_env_defaults(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 @pytest.fixture
 def fake_eam() -> FakeEAM:
     return FakeEAM()
+
+
+@pytest.fixture
+def json_eam():
+    """Provide a JsonEAM instance backed by seed_data.json."""
+    from services.json_eam import JsonEAM  # type: ignore[import-not-found]
+
+    return JsonEAM()
+
+
+@pytest.fixture
+def patch_eam(monkeypatch: pytest.MonkeyPatch, fake_eam: FakeEAM):
+    """Monkeypatch get_eam_service in a given module to return fake_eam.
+    Returns a callable: patch_eam(module) patches that module's get_eam_service.
+    """
+
+    def _patch(module):
+        monkeypatch.setattr(module, "get_eam_service", lambda: fake_eam)
+
+    return _patch
 
 
 @pytest.fixture

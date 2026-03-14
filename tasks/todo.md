@@ -1,3 +1,295 @@
+## Fix: Search Failures for Natural Language Asset/WO Queries - 2026-03-05
+
+**Scope:**
+- Component(s): `backend/services/query_engine.py`, `backend/services/search_matcher.py`, `tests/unit/`
+- Risk Level: Medium (search logic fixes)
+- Goal: Fix 5 bugs causing natural-language asset/WO search failures for track circuits and compound names.
+
+**Checklist:**
+- [x] Step 1: Fix department/asset-type conflict in `_extract_filters()` — skip dept tokens that are part of matched asset_type phrases
+- [x] Step 2: Add "id" to NOISE_WORDS in both query_engine.py and search_matcher.py
+- [x] Step 3: Add compound-word matching to `query_matches_text()` in search_matcher.py
+- [x] Step 4: Add relaxed-filter fallback to `_search_work_orders()`
+- [x] Step 5: Fix `_ASSET_ID_PREFIXES` — TRK→track_bed, add TRC→track_circuit
+- [x] Step 6: Add basic n-gram fuzzy matching for station names (bigram Dice coefficient, threshold 0.6, min 5 chars)
+- [x] Regression tests for all fixed scenarios (8 new tests)
+- [x] Verification: 56 passed, 0 failed
+- [x] Update lessons.md
+
+**Verification:**
+- [x] `python3 -m py_compile` on both modified files — PASS
+- [x] `python3 -m pytest -o "addopts=" tests/unit/ -v` — 56 passed (48 existing + 8 new)
+- [x] E2E: `smart_search("Is there any open work order for Metrotown Track Circuit 3?")` → WO-2025-0006
+- [x] E2E: `smart_search("What's the asset ID for Metro Town Track Circuit 3?")` → TRC-MT-003
+- [x] E2E: `query_matches_text("metro town track circuit 3", "Metrotown Track Circuit #3 ...")` → True
+- [x] E2E: `query_matches_text("downtrex circuit 3", "Downtown Track Circuit #3 ...")` → True
+
+---
+
+## Codebase Optimization — Deduplication & Structural Cleanup - 2026-03-05
+
+**Scope:**
+- Component(s): `backend/services/base_eam.py`, `backend/services/json_eam.py`, `backend/services/firestore_eam.py`, `backend/agent/tools/asset_lookup.py`, `backend/agent/prompts.py`, `frontend/app.js`, `frontend/style.css`, `tests/conftest.py`
+- Risk Level: Medium (search logic refactor, frontend UI consolidation)
+- Goal: Eliminate ~400-500 lines of duplication, fix bugs, improve maintainability.
+
+**Phase 1 — Quick wins:**
+- [x] P1-B: Fix QueryEngine double-instantiation in `asset_lookup.py:72`
+- [x] P3-D: Fix CSS issues (defined `--accent-green`, merged duplicate crosshair animation, replaced `!important` with specificity)
+
+**Phase 2 — Backend deduplication:**
+- [x] P1-A: Extract shared search helpers into `BaseEAMService` (`build_asset_searchable`, `build_wo_searchable`, `aggregate_stations`, `resolve_location_dept_filters`, `tokenize_kb_query`, `kb_tokens_match`)
+- [x] P3-C: FirestoreEAM KB search now uses shared `tokenize_kb_query` + `kb_tokens_match`
+- [x] P2-C: Deduplicate prompt shared sections (`_CONFIRMATION_RULES`, `_CONTEXT_RETENTION_RULES`, `_NARRATION_RULES`, `_DEPARTMENTS`)
+
+**Phase 3 — Frontend deduplication:**
+- [x] P1-C: Unified `_buildConfirmationCard()` used by both `renderConfirmationCard` and `renderChatConfirmationCard`
+- [x] P2-A: Consolidated 5 data loaders into generic `loadPageData()` + per-page filter/render configs
+
+**Phase 4 — Test infrastructure:**
+- [x] P2-D: Added `json_eam` and `patch_eam` fixtures to `tests/conftest.py`; refactored `test_work_order_tool.py` to use `patch_eam`
+
+**Verification:**
+- [x] `python3 -m pytest -o "addopts=" tests/unit/ -v` — 48 passed
+- [x] `node --check frontend/app.js` — PASS
+- [x] `node --check frontend/sw.js` — PASS
+- [x] `python3 -m py_compile` on all modified Python files — PASS
+
+---
+
+## Fix: ASR Fuzzy Matching, Asset Pre-Resolution, and Media Card Cleanup - 2026-03-05
+
+**Scope:**
+- Component(s): `backend/services/query_engine.py`, `backend/services/search_matcher.py`, `backend/api/websocket.py`, `backend/agent/prompts.py`, `tests/unit/`
+- Risk Level: Medium (search normalization, WebSocket card output, agent prompts)
+- Goal: Fix three interconnected UX problems: (1) VOBC and other domain term ASR misrecognition, (2) inconsistent WO search when asset IDs are malformed, (3) unwanted media cards for non-confirmation tool results.
+
+**Checklist:**
+- [x] Add `_ASR_CORRECTIONS` map and `_apply_asr_corrections()` to QueryEngine for VOBC/domain term ASR variants
+- [x] Update `_detect_train_subsystem_suffix()` and `_extract_spoken_tc_ids()` for VOBC ASR variants
+- [x] Add ASR variant entries to `ASSET_TYPE_ALIASES`
+- [x] Apply ASR corrections in `build_query()`, `_extract_ids()`, and `normalize_asset_id()`
+- [x] Add short-form asset hint extraction to `_extract_ids()` (e.g. "RC 139" → "RC-139")
+- [x] Add pre-resolution of unmatched asset IDs in `_search_work_orders()` via `suggest_asset_candidates()`
+- [x] Fix pre-existing bug: `_ASSET_ID_PATTERN` processing crashed on None station code group
+- [x] Add `_DOMAIN_CORRECTIONS` to `search_matcher.py` `_normalize_token()` for domain terms
+- [x] Remove `_extract_media_cards()` calls from both inspection and chat side-channel tasks in `websocket.py`
+- [x] Add asset resolution instructions to both agent prompts
+- [x] Add tests for VOBC ASR variants, short-form hints, pre-resolution, and ASR correction
+- [x] Run verification and log outcomes
+
+**Verification:**
+- [x] `python3 -m pytest -o "addopts=" tests/unit/ -v` — 47 passed, 1 pre-existing failure (`test_json_eam_create_and_update_work_order` — missing `normalize_work_order_updates` method, unrelated)
+- [x] New test cases:
+  - `test_build_query_resolves_vobc_asr_variant_v_obc` — PASS
+  - `test_build_query_resolves_vobc_asr_variant_ovc` — PASS
+  - `test_build_query_resolves_vobc_asr_variant_bobc` — PASS
+  - `test_detect_train_subsystem_suffix_vobc_asr_variants` — PASS
+  - `test_apply_asr_corrections` — PASS
+  - `test_extract_ids_catches_short_form_rc_139` — PASS
+  - `test_search_work_orders_pre_resolves_rc_to_rct` — PASS
+  - `test_smart_search_resolves_vobc_asr_variant_ovc` — PASS
+  - `test_smart_search_resolves_vobc_asr_variant_v_obc` — PASS
+  - `test_lookup_asset_resolves_vobc_asr_variant` — PASS
+- [x] All pre-existing tests still pass
+
+## Review - ASR Fuzzy Matching, Asset Pre-Resolution, and Media Card Cleanup
+
+**What Worked:**
+- ASR correction map applied early in the pipeline transforms common speech errors ("v obc" → "vobc", "ovc" → "vobc") before any ID extraction.
+- Short-form asset hints ("RC 139") are now caught in `_extract_ids()` main pipeline, not just the fallback path.
+- Pre-resolution in `_search_work_orders()` automatically resolves unmatched asset IDs to real assets (e.g. "RC-139" → "TC-139") before searching work orders.
+- Media card removal from side-channel tasks eliminates UI clutter — only confirmation cards appear.
+- Fixed pre-existing crash in `_ASSET_ID_PATTERN` processing where optional station code group could be None.
+
+**Residual Risks:**
+- Pre-resolution only substitutes when confidence >= 0.7 from `suggest_asset_candidates()`; lower-confidence cases still fall through to the existing suggestion flow.
+- ASR correction map covers known variants; new speech patterns may need additions over time.
+- `_extract_media_cards()` function still exists (used by existing tests) but is no longer called at runtime.
+
+---
+
+## Fix: Incorrect Asset ID Guess + User Confirmation for WO Search - 2026-03-05
+
+**Scope:**
+- Component(s): `backend/services/query_engine.py`, `backend/agent/tools/work_order.py`, `backend/agent/tools/smart_search.py`, `backend/agent/prompts.py`, `tests/`
+- Risk Level: High (wrong asset assumptions in technician workflow)
+- Goal: When user provides an incorrect/partial asset ID or name, attempt a best-guess mapping, ask user to confirm candidate asset(s), and avoid false “no work orders for X” claims.
+
+**Checklist:**
+- [x] Reproduce current failure with malformed ID query (`rc 139`) and capture behavior
+- [x] Add candidate-asset suggestion logic for malformed/near-match asset IDs
+- [x] Wire suggestion metadata into work-order/smart-search responses for agent confirmation flow
+- [x] Update prompts so agent must confirm guessed asset before final response/actions
+- [x] Add regression tests for malformed ID mapping and no-match messaging
+- [x] Run verification commands and log outcomes
+- [x] Record review notes and residual risks
+
+**Root Cause Notes:**
+- Query text like `rc 139` was treated as free text (`rc`, `139`) with no asset-ID validation path.
+- When search returned zero rows, tools returned plain empty results, so the agent often inferred an incorrect ID and replied with a false negative.
+
+**Implementation Outcome:**
+- [x] Added shorthand/malformed ID hint extraction (`RC-139`) and candidate scoring in `QueryEngine`.
+- [x] Added `suggest_asset_candidates()` to return likely assets (for example, `TC-139`) with confidence/reason metadata.
+- [x] Updated `manage_work_order(action="search")` to return:
+  - `needs_asset_confirmation`, `guessed_assets`, `attempted_asset_hints` when likely matches exist.
+  - `no_asset_match` when no candidate asset exists for the hinted ID.
+- [x] Updated `smart_search` with the same confirmation/no-match metadata for zero-result work-order/asset queries.
+- [x] Updated prompts to require explicit user confirmation when a guessed asset is returned.
+
+**Verification:**
+- [x] Deterministic check:
+  - `manage_work_order(action="search", description="...rc 139")` now returns `needs_asset_confirmation=true` with `TC-139` suggestions.
+  - `smart_search("...rc 139")` now returns same confirmation metadata.
+  - `smart_search("...zz 999")` returns `no_asset_match=true`.
+- [x] `python3 -m pytest --no-cov tests/unit/test_query_engine_work_order_retrieval.py tests/unit/test_work_order_tool.py tests/unit/test_smart_search_tool.py tests/unit/test_asset_lookup_tool.py tests/unit/test_firestore_work_order_search.py tests/unit/test_json_eam.py` (28 passed)
+
+## Review - Incorrect Asset ID Guess + User Confirmation for WO Search
+
+**What Worked:**
+- Tool outputs now explicitly support correction flow instead of silent zero-result failures for malformed IDs.
+- Agent can ask “Did you mean `TC-139`?” before concluding there are no work orders.
+- No-match path is explicit when the asset hint is invalid.
+
+**Residual Risks / Follow-ups:**
+- Prefix-guessing uses heuristic similarity (single-edit distance); edge cases may still need domain-specific alias tuning.
+- Live on-device conversational verification is still required (ASR variance in noisy environments).
+
+## Fix: Asset/Work-Order Search Consistency Across Chat + Live Agent - 2026-03-05
+
+**Scope:**
+- Component(s): `backend/services/query_engine.py`, `backend/agent/tools/asset_lookup.py`, `backend/agent/tools/work_order.py`, `backend/services/json_eam.py`, `backend/services/firestore_eam.py`, `tests/`
+- Risk Level: High (agent retrieval reliability for maintenance operations)
+- Goal: Determine whether misses are caused by natural-language/ID normalization, query strategy, or both; implement one consistent retrieval path used by chat and live inspection flows.
+
+**Checklist:**
+- [x] Reproduce the inconsistency in deterministic tests covering both chat and live tool paths
+- [x] Isolate root cause(s) in ID extraction, intent routing, and backend query matching
+- [x] Implement fix so asset + work-order lookups share consistent normalization and search strategy
+- [x] Add regression tests for natural-language phrasing and explicit ID requests
+- [x] Run verification commands and log outcomes
+- [x] Record review summary and residual risks
+
+**Root Cause Notes:**
+- Chat/live tool wiring is already shared; inconsistency came from input shape, not separate backend query stacks.
+- Live ASR-style IDs (`e s c s c 0 0 3`, `e s c dash s c dash zero zero three`, `t c one three eight prop`) were not normalized into canonical IDs.
+- After ID extraction failed, tokenized AND matching treated leftover digit fragments (`0`, `3`, `1`, `8`) as mandatory terms, causing empty WO/asset results.
+
+**Implementation Outcome:**
+- [x] Added spoken-ID parsing in `QueryEngine` for letter-by-letter and dash-word transcriptions.
+- [x] Extended `normalize_asset_id()` to resolve spoken/transcribed forms.
+- [x] Added cleanup pass to prune digit-by-digit ASR artifacts once a canonical asset ID is extracted.
+- [x] Added spoken punctuation fillers (`dash`, `hyphen`, `minus`, `number`) to shared noise-token sets.
+- [x] Added regression coverage for query engine + tool-level paths.
+
+**Verification:**
+- [x] Deterministic reproduction before/after (local script):
+  - Before fix: spoken-ID queries returned `0` work orders / wrong asset hits.
+  - After fix: spoken variants resolve to `ESC-SC-003` and `TC-138-PROP`, returning matching open work orders.
+- [x] `python3 -m pytest --no-cov tests/unit/test_query_engine_work_order_retrieval.py tests/unit/test_asset_lookup_tool.py tests/unit/test_work_order_tool.py tests/unit/test_firestore_work_order_search.py tests/unit/test_json_eam.py` (23 passed)
+
+## Review - Asset/Work-Order Search Consistency Across Chat + Live Agent
+
+**What Worked:**
+- Search consistency now comes from one normalization path that handles typed IDs and speech-transcribed IDs.
+- `lookup_asset`, `manage_work_order(action="search")`, and `smart_search` all benefit via shared `QueryEngine`.
+- New tests lock the previously failing patterns so regressions are caught quickly.
+
+**Residual Risks / Follow-ups:**
+- Very noisy ASR variants outside these patterns (for example, phonetic alphabet like "echo sierra charlie") are still not normalized.
+- Full live mobile validation from RULES.md (camera/mic end-to-end) remains pending in this environment.
+
+## Fix: Open Work-Order Retrieval Reliability for Recognized Equipment - 2026-03-04
+
+**Scope:**
+- Component(s): `backend/services/query_engine.py`, `backend/services/json_eam.py`, `backend/services/firestore_eam.py`, `tests/`
+- Risk Level: Medium (search behavior in agent and API paths)
+- Goal: Eliminate intermittent misses when asking for open work orders on already-recognized equipment.
+
+**Checklist:**
+- [x] Reproduce failure with realistic spoken queries and capture root causes
+- [x] Expand query normalization to drop conversational filler words and normalize number words
+- [x] Replace fragile substring matching with token-aware matching for assets/work orders
+- [x] Fix Firestore `search_work_orders()` crash path on nullable fields
+- [x] Add regression tests for “is there any open work order…” variants and numeric word/ID cases
+- [x] Run required verification commands and capture outcomes
+- [x] Record review summary and residual risks
+
+**Root Cause Notes (WIP):**
+- Query cleaning leaves filler words (`there`, `any`, `do`, `have`) that become mandatory AND-match terms.
+- Number words (`one`, `three`) are not normalized, causing misses against `#1`/`003` style identifiers.
+- Numeric single-character tokens are dropped during cleaning, reducing asset-instance specificity.
+- Firestore WO text join uses nullable fields directly (`assigned_to`), risking runtime `TypeError`.
+
+**Verification:**
+- [x] Reproduction script before fix (QueryEngine + JsonEAM): natural phrases with fillers returned `0` for known open WO on `ESC-SC-003`
+- [x] Reproduction script after fix: same phrases now return `WO-2026-0151` and `WO-2026-0152`
+- [x] `python3 -m pytest --no-cov tests/unit/test_query_engine_work_order_retrieval.py tests/unit/test_firestore_work_order_search.py tests/unit/test_json_eam.py tests/unit/test_work_order_tool.py` (12 passed)
+
+## Review - Open Work-Order Retrieval Reliability
+
+**What Worked:**
+- Query normalization now strips conversational filler terms and normalizes spoken numbers to digits.
+- Shared matcher now uses token-aware matching with numeric equivalence (`3` = `003`) across both JsonEAM and FirestoreEAM.
+- Firestore WO search no longer crashes when `assigned_to` is null.
+- New regression tests cover natural-language phrasing, spaced asset IDs, and Firestore nullable-field behavior.
+
+**Residual Risks / Follow-ups:**
+- Full RULES.md mobile E2E/live-audio verification is not runnable in this environment; field validation is still needed on device.
+- Firestore search still streams candidate documents for text matching (status/priority are server-filtered first); this is correct for now but could need indexing strategy at larger scale.
+
+**WIP Follow-up (User-reported after fix):**
+- New failure pattern reproduced: `train car 138 propulsion` returns no asset due `asset_type=train_car` over-filtering while target asset is `TC-138-PROP` (`type=propulsion`).
+- Action underway: add train-car subsystem ID extraction + smarter asset-type specificity + prompt/tool guardrails against claiming on-screen data when search returns zero.
+
+**Follow-up Outcome (Completed):**
+- [x] Added train-car subsystem extraction (`train car 138 propulsion` -> `TC-138-PROP`) in QueryEngine ID parser.
+- [x] Added asset-type specificity logic so subsystem types (propulsion/VOBC/door) outrank generic `train_car` when both appear.
+- [x] Added relaxed asset-search fallback when NLP-derived filters over-constrain results.
+- [x] Updated work-order search to include all extracted non-WO asset IDs (supports `TC-*` format).
+- [x] Updated prompts to prevent "it's on your screen" claims when tool results are empty.
+- [x] Added side-channel media-card extraction for work-order results and explicit no-result smart-search summary cards.
+- [x] Added targeted regression tests for train-car subsystem asset and work-order retrieval.
+
+**Follow-up Verification:**
+- [x] `python3 -m pytest --no-cov tests/unit/test_query_engine_work_order_retrieval.py tests/unit/test_asset_lookup_tool.py tests/unit/test_firestore_work_order_search.py tests/unit/test_json_eam.py tests/unit/test_work_order_tool.py` (17 passed)
+- [x] `python3 -m pytest --no-cov tests/unit/test_websocket_helpers.py tests/unit/test_query_engine_work_order_retrieval.py tests/unit/test_asset_lookup_tool.py tests/unit/test_firestore_work_order_search.py tests/unit/test_json_eam.py tests/unit/test_work_order_tool.py` (23 passed)
+- [x] Local deterministic checks:
+  - `lookup_asset(query='train car 138 propulsion')` -> `TC-138-PROP`
+  - `manage_work_order(action='search', description='...open work order for train car 138 propulsion')` -> `WO-2026-0166`
+  - `smart_search('train car 138 propulsion')` -> `has_results=True`, top asset `TC-138-PROP`
+
+## Deploy: Asset/WO Retrieval Fixes - 2026-03-04
+
+**Scope:**
+- Component(s): deployment pipeline (`scripts/deploy.sh`), Cloud Run service
+- Risk Level: Medium (production deployment)
+- Goal: Deploy latest backend/frontend retrieval reliability fixes to production and verify health/revision.
+
+**Checklist:**
+- [x] Validate deploy script parameters and current repo state
+- [x] Execute deployment script with project + Gemini key
+- [x] Verify service health endpoint and latest ready revision
+- [x] Log deployment review outcome
+
+**Verification:**
+- [x] Deploy script completed: `./scripts/deploy.sh <project-id> <gemini-api-key> us-central1`
+- [x] Health check: `curl -sS https://maintenance-eye-swrz6daraq-uc.a.run.app/health` -> `{"status":"healthy",...,"eam_backend":"FirestoreEAM"}`
+- [x] Revision check: latest created/ready revision `maintenance-eye-00025-6hd`, 100% traffic
+- [x] Live asset lookup check: `GET /api/assets?q=train car 138 propulsion` returns `TC-138-PROP`
+- [x] Live WO lookup check: `GET /api/work-orders?q=TC-138-PROP&status=open` returns `WO-2026-0166`
+
+## Review - Deploy: Asset/WO Retrieval Fixes
+
+**What Worked:**
+- Cloud Build succeeded (`1d327453-5a59-4e0a-9b8e-d1d4154efad9`) and Terraform applied service update successfully.
+- Cloud Run now serves revision `maintenance-eye-00025-6hd` at `https://maintenance-eye-swrz6daraq-uc.a.run.app` with 100% traffic.
+- Health endpoint reports healthy service and active Firestore backend.
+
+**What Didn't / Residual Risk:**
+- Deployment script still warns that default compute service account lookup for Firestore IAM binding could not be auto-completed; manual IAM validation remains advisable.
+
 ## Enterprise Data Explorer Redesign - 2026-03-01
 
 **Scope:**
@@ -317,3 +609,114 @@
 
 **What Didn't:**
 - Default repository pytest `addopts` enforces project-wide coverage threshold, so targeted runs required `-o addopts=''` for focused validation.
+
+## Fix Markdown Rendering in Chat + Live Inspection - 2026-03-04
+
+**Scope:**
+- Component(s): frontend/app.js, frontend/style.css
+- Risk Level: Low (frontend text rendering)
+- Goal: Render Markdown formatting (`**bold**`, `*italic*`, bullet lists) in chat and live inspection message bubbles instead of showing literal symbols.
+
+**Checklist:**
+- [x] Review workflow requirements in `RULES.md`
+- [x] Add scoped task plan before edits
+- [x] Inspect current chat/live text rendering paths
+- [x] Implement safe markdown renderer for message text
+- [x] Apply renderer to chat and live inspection outputs
+- [x] Verify markdown list/italic/bold rendering and no JS syntax errors
+- [x] Log review outcome
+
+**Progress Notes:**
+- [x] Confirmed root cause: `addAgentMessage`, `addChatMessage`, and transcript rendering paths used `textContent`, escaping markdown syntax.
+- [x] Added `renderMarkdown()` + `renderInlineMarkdown()` with HTML escaping and list parsing.
+- [x] Updated agent/chat/transcript output rendering to use safe markdown HTML for assistant content while keeping user text plain.
+- [x] Added `.markdown-content` styles for paragraph and list spacing in message bubbles.
+
+**Verification:**
+- [x] `node --check frontend/app.js` — PASS
+- [x] `node --check frontend/sw.js` — PASS
+- [x] `rg -n "renderMarkdown|renderInlineMarkdown|markdown-content" frontend/app.js frontend/style.css` confirms integration points
+
+## Review - Fix Markdown Rendering in Chat + Live Inspection
+
+**What Worked:**
+- Assistant responses now render `**bold**`, `*italic*`, and `-`/`*` list items as formatted HTML in both chat and live inspection panes.
+- Rendering stays safe by escaping HTML before markdown conversion.
+
+**What Didn't:**
+- Real browser/manual UI validation was not run in this terminal-only environment.
+
+## Fix Chat Readability: Inline Markdown Lists + Message Chunking - 2026-03-04
+
+**Scope:**
+- Component(s): frontend/app.js, frontend/style.css
+- Risk Level: Low (frontend rendering only)
+- Goal: Ensure assistant replies render readable structured output when markdown bullets/emphasis are emitted inline or chunked, instead of showing bundled text.
+
+**Checklist:**
+- [x] Review workflow requirements in `RULES.md`
+- [x] Add scoped task plan before edits
+- [x] Inspect current markdown rendering and chat/live message chunk behavior
+- [x] Improve markdown normalization for inline bullet markers
+- [x] Harden inline emphasis parsing to avoid misinterpreting bullet markers
+- [x] Verify JS syntax and key rendering paths
+- [x] Log review outcome
+
+**Progress Notes:**
+- [x] Reproduced likely failure mode from user-provided VOBC sample: bullets are inline in one paragraph, so list parser does not split rows.
+- [x] Added `normalizeMarkdownBlocks()` to split inline `*`/`-` and `1.` markers into true markdown list lines before rendering.
+- [x] Tightened `renderInlineMarkdown()` italic conversion so bullet markers with trailing spaces are not interpreted as emphasis.
+- [x] Extended renderer to support ordered lists (`<ol>`) with proper list-open/list-close transitions.
+- [x] Bumped frontend cache versioning (`style.css?v=12`, `app.js?v=12`, `sw.js` cache `maintenance-eye-v12`) so users receive the fix immediately.
+
+**Verification:**
+- [x] `node --check frontend/app.js` — PASS
+- [x] `node --check frontend/sw.js` — PASS
+- [x] `rg -n "normalizeMarkdownBlocks|orderedListMatch|markdown-content ol" frontend/app.js frontend/style.css` confirms integration points
+- [x] `rg -n "style\\.css\\?v=12|app\\.js\\?v=12|maintenance-eye-v12" frontend/index.html frontend/sw.js` confirms cache-busting updates
+
+## Review - Fix Chat Readability: Inline Markdown Lists + Message Chunking
+
+**What Worked:**
+- Inline bullet lists in one-line responses are now split and rendered as separate list items.
+- Bold/italic formatting remains available without accidentally consuming bullet markers.
+- Ordered-list output is now rendered correctly when model responses include `1.`, `2.`, etc.
+
+**What Didn't:**
+- Manual browser validation (real chat interaction in desktop/mobile UI) was not executed in this terminal-only environment.
+
+## Deploy Chat Readability Fix to Cloud Run - 2026-03-04
+
+**Scope:**
+- Component(s): deployment pipeline (`scripts/deploy.sh`), Cloud Run service
+- Risk Level: Medium (production deployment)
+- Goal: Deploy latest frontend rendering/cache-busting fix so chat responses display readable formatted lists in production.
+
+**Checklist:**
+- [x] Review workflow requirements in `RULES.md`
+- [x] Add scoped task plan before deployment steps
+- [x] Validate deployment script inputs and current git state
+- [x] Execute deployment script with project configuration
+- [x] Verify deployment success (service URL/revision)
+- [x] Log review outcome
+
+**Progress Notes:**
+- [x] Confirmed `scripts/deploy.sh` inputs and active gcloud auth/project before deployment.
+- [x] First in-sandbox deploy attempt failed due DNS/network sandbox restrictions and `.env` CRLF sourcing quirks.
+- [x] Re-ran deployment with escalated permissions using CRLF-safe env extraction from `.env`.
+- [x] Cloud Build `de8cc052-d8d2-4e1c-b10e-5ca1156b82bf` completed successfully.
+- [x] Terraform apply updated Cloud Run service revision to `maintenance-eye-00023-9rq` with 100% traffic.
+
+**Verification:**
+- [x] `curl -sS https://maintenance-eye-swrz6daraq-uc.a.run.app/health` — PASS (`status: healthy`)
+- [x] `gcloud run services describe maintenance-eye --region=us-central1 --project=maintenance-eye-488403 --format='yaml(status.url,status.latestCreatedRevisionName,status.latestReadyRevisionName,status.traffic)'` — PASS
+
+## Review - Deploy Chat Readability Fix to Cloud Run
+
+**What Worked:**
+- Deployment script completed end-to-end (APIs, secret version update, Cloud Build, Terraform apply).
+- Cloud Run now serves revision `maintenance-eye-00023-9rq` at `https://maintenance-eye-swrz6daraq-uc.a.run.app` with 100% traffic.
+- Health endpoint confirms service is healthy and using Firestore backend.
+
+**What Didn't:**
+- Script warning remained: could not auto-bind Firestore role to default compute service account (manual IAM verification may still be needed in this project).

@@ -18,11 +18,11 @@ Run:
     python scripts/seed_data.py
 """
 
-import os
-import sys
-import json
-import random
 import argparse
+import json
+import os
+import random
+import sys
 from datetime import datetime, timedelta
 
 # Add backend to path for imports
@@ -99,8 +99,14 @@ DEPARTMENTS = {
 }
 
 INSPECTORS = [
-    "J. Chen", "M. Singh", "R. Patel", "K. Williams",
-    "A. Thompson", "D. Lee", "S. Martinez", "T. Brown",
+    "J. Chen",
+    "M. Singh",
+    "R. Patel",
+    "K. Williams",
+    "A. Thompson",
+    "D. Lee",
+    "S. Martinez",
+    "T. Brown",
 ]
 
 CONDITIONS = ["good", "requires_attention", "requires_immediate_action", "out_of_service"]
@@ -110,46 +116,149 @@ CONDITIONS = ["good", "requires_attention", "requires_immediate_action", "out_of
 # EAM Codes — Realistic Problem / Fault / Action Codes
 # ============================================================================
 
+
 def generate_eam_codes():
     """Generate 60 EAM classification codes."""
     codes = []
 
     # Problem codes (20)
     problem_codes = [
-        ("ME-001", "Structural Damage", "Physical damage to structural components", ["escalator", "elevator", "platform_door"]),
-        ("ME-002", "Corrosion", "Rust or corrosion on metal surfaces", ["escalator", "elevator", "rail_section", "third_rail"]),
-        ("ME-003", "Surface Wear", "Normal wear on contact surfaces", ["escalator", "elevator", "switch_machine", "rail_section"]),
-        ("ME-004", "Electrical Fault", "Electrical system malfunction", ["signal_controller", "transformer", "rectifier", "lighting_panel"]),
-        ("ME-005", "Mechanical Failure", "Mechanical component breakdown", ["escalator", "elevator", "switch_machine", "door_system"]),
-        ("ME-006", "Fluid Leak", "Hydraulic or lubricant leak", ["escalator", "elevator", "switch_machine"]),
-        ("ME-007", "Alignment Issue", "Component misalignment", ["switch_machine", "rail_section", "track_bed", "escalator"]),
-        ("ME-008", "Noise/Vibration", "Unusual noise or vibration", ["escalator", "elevator", "bogie", "door_system"]),
-        ("ME-009", "Safety Hazard", "Identified safety concern", ["escalator", "elevator", "platform_door", "fire_suppression"]),
-        ("ME-010", "Contamination", "Foreign material or contamination", ["switch_machine", "track_circuit", "signal_controller"]),
-        ("ME-011", "Temperature Anomaly", "Abnormal temperature reading", ["transformer", "rectifier", "hvac_unit", "hvac_station"]),
-        ("ME-012", "Signal Degradation", "Degraded signal quality", ["track_circuit", "radio_unit", "signal_controller"]),
-        ("ME-013", "Water Ingress", "Water penetration into equipment", ["signal_controller", "lighting_panel", "power_cable"]),
-        ("ME-014", "Insulation Failure", "Electrical insulation deterioration", ["power_cable", "transformer", "third_rail"]),
-        ("ME-015", "Control System Error", "PLC or control system fault", ["escalator", "elevator", "signal_controller"]),
-        ("ME-016", "Fastener Loosening", "Bolts, nuts, or fasteners loosening", ["rail_section", "track_bed", "escalator"]),
-        ("ME-017", "Seal Deterioration", "Gaskets or seals degrading", ["door_system", "hvac_unit", "elevator"]),
-        ("ME-018", "Lighting Failure", "Light fixture or LED failure", ["lighting_panel", "cctv_camera"]),
-        ("ME-019", "Communication Failure", "Network or comm system fault", ["radio_unit", "cctv_camera", "signal_controller"]),
-        ("ME-020", "Ventilation Issue", "Air flow or ventilation problem", ["hvac_unit", "hvac_station"]),
+        (
+            "ME-001",
+            "Structural Damage",
+            "Physical damage to structural components",
+            ["escalator", "elevator", "platform_door"],
+        ),
+        (
+            "ME-002",
+            "Corrosion",
+            "Rust or corrosion on metal surfaces",
+            ["escalator", "elevator", "rail_section", "third_rail"],
+        ),
+        (
+            "ME-003",
+            "Surface Wear",
+            "Normal wear on contact surfaces",
+            ["escalator", "elevator", "switch_machine", "rail_section"],
+        ),
+        (
+            "ME-004",
+            "Electrical Fault",
+            "Electrical system malfunction",
+            ["signal_controller", "transformer", "rectifier", "lighting_panel"],
+        ),
+        (
+            "ME-005",
+            "Mechanical Failure",
+            "Mechanical component breakdown",
+            ["escalator", "elevator", "switch_machine", "door_system"],
+        ),
+        (
+            "ME-006",
+            "Fluid Leak",
+            "Hydraulic or lubricant leak",
+            ["escalator", "elevator", "switch_machine"],
+        ),
+        (
+            "ME-007",
+            "Alignment Issue",
+            "Component misalignment",
+            ["switch_machine", "rail_section", "track_bed", "escalator"],
+        ),
+        (
+            "ME-008",
+            "Noise/Vibration",
+            "Unusual noise or vibration",
+            ["escalator", "elevator", "bogie", "door_system"],
+        ),
+        (
+            "ME-009",
+            "Safety Hazard",
+            "Identified safety concern",
+            ["escalator", "elevator", "platform_door", "fire_suppression"],
+        ),
+        (
+            "ME-010",
+            "Contamination",
+            "Foreign material or contamination",
+            ["switch_machine", "track_circuit", "signal_controller"],
+        ),
+        (
+            "ME-011",
+            "Temperature Anomaly",
+            "Abnormal temperature reading",
+            ["transformer", "rectifier", "hvac_unit", "hvac_station"],
+        ),
+        (
+            "ME-012",
+            "Signal Degradation",
+            "Degraded signal quality",
+            ["track_circuit", "radio_unit", "signal_controller"],
+        ),
+        (
+            "ME-013",
+            "Water Ingress",
+            "Water penetration into equipment",
+            ["signal_controller", "lighting_panel", "power_cable"],
+        ),
+        (
+            "ME-014",
+            "Insulation Failure",
+            "Electrical insulation deterioration",
+            ["power_cable", "transformer", "third_rail"],
+        ),
+        (
+            "ME-015",
+            "Control System Error",
+            "PLC or control system fault",
+            ["escalator", "elevator", "signal_controller"],
+        ),
+        (
+            "ME-016",
+            "Fastener Loosening",
+            "Bolts, nuts, or fasteners loosening",
+            ["rail_section", "track_bed", "escalator"],
+        ),
+        (
+            "ME-017",
+            "Seal Deterioration",
+            "Gaskets or seals degrading",
+            ["door_system", "hvac_unit", "elevator"],
+        ),
+        (
+            "ME-018",
+            "Lighting Failure",
+            "Light fixture or LED failure",
+            ["lighting_panel", "cctv_camera"],
+        ),
+        (
+            "ME-019",
+            "Communication Failure",
+            "Network or comm system fault",
+            ["radio_unit", "cctv_camera", "signal_controller"],
+        ),
+        (
+            "ME-020",
+            "Ventilation Issue",
+            "Air flow or ventilation problem",
+            ["hvac_unit", "hvac_station"],
+        ),
     ]
 
     for code, label, desc, types in problem_codes:
         dept = _infer_department(types[0])
-        codes.append({
-            "code_type": "problem_code",
-            "code": code,
-            "label": label,
-            "department": dept,
-            "asset_types": types,
-            "description": desc,
-            "related_codes": [],
-            "hexagon_mapping": f"HX-P-{code.split('-')[1]}",
-        })
+        codes.append(
+            {
+                "code_type": "problem_code",
+                "code": code,
+                "label": label,
+                "department": dept,
+                "asset_types": types,
+                "description": desc,
+                "related_codes": [],
+                "hexagon_mapping": f"HX-P-{code.split('-')[1]}",
+            }
+        )
 
     # Fault codes (20)
     fault_codes = [
@@ -183,16 +292,18 @@ def generate_eam_codes():
     for i, (code, label, desc) in enumerate(fault_codes):
         dept = dept_cycle[i % len(dept_cycle)]
         types = DEPARTMENTS[dept]["asset_types"][:2]
-        codes.append({
-            "code_type": "fault_code",
-            "code": code,
-            "label": label,
-            "department": dept,
-            "asset_types": types,
-            "description": desc,
-            "related_codes": [problem_codes[i % len(problem_codes)][0]],
-            "hexagon_mapping": f"HX-F-{code}",
-        })
+        codes.append(
+            {
+                "code_type": "fault_code",
+                "code": code,
+                "label": label,
+                "department": dept,
+                "asset_types": types,
+                "description": desc,
+                "related_codes": [problem_codes[i % len(problem_codes)][0]],
+                "hexagon_mapping": f"HX-F-{code}",
+            }
+        )
 
     # Action codes (20)
     action_codes = [
@@ -221,16 +332,18 @@ def generate_eam_codes():
     for i, (code, label, desc) in enumerate(action_codes):
         dept = dept_cycle[i % len(dept_cycle)]
         types = DEPARTMENTS[dept]["asset_types"]
-        codes.append({
-            "code_type": "action_code",
-            "code": code,
-            "label": label,
-            "department": dept,
-            "asset_types": types,
-            "description": desc,
-            "related_codes": [],
-            "hexagon_mapping": f"HX-A-{code}",
-        })
+        codes.append(
+            {
+                "code_type": "action_code",
+                "code": code,
+                "label": label,
+                "department": dept,
+                "asset_types": types,
+                "description": desc,
+                "related_codes": [],
+                "hexagon_mapping": f"HX-A-{code}",
+            }
+        )
 
     return codes
 
@@ -238,6 +351,7 @@ def generate_eam_codes():
 # ============================================================================
 # Assets — 80 realistic transit assets
 # ============================================================================
+
 
 def generate_assets():
     """Generate 80 assets across all departments."""
@@ -251,11 +365,13 @@ def generate_assets():
             for i in range(count):
                 station = random.choice(STATIONS)
                 prefix = _get_prefix(dept_name, asset_type)
-                asset_id = f"{prefix}-{station['code']}-{i+1:03d}"
+                asset_id = f"{prefix}-{station['code']}-{i + 1:03d}"
                 asset_counter += 1
 
                 install_year = random.randint(2002, 2022)
-                last_insp = (datetime.utcnow() - timedelta(days=random.randint(5, 180))).strftime("%Y-%m-%d")
+                last_insp = (datetime.utcnow() - timedelta(days=random.randint(5, 180))).strftime(
+                    "%Y-%m-%d"
+                )
 
                 status = random.choices(
                     ["operational", "degraded", "out_of_service"],
@@ -263,35 +379,39 @@ def generate_assets():
                 )[0]
 
                 manufacturer = random.choice(dept_info["manufacturers"])
-                model_suffix = random.choice(["X200", "Pro", "Mark IV", "S-Type", "2000", "Elite", "V3"])
+                model_suffix = random.choice(
+                    ["X200", "Pro", "Mark IV", "S-Type", "2000", "Elite", "V3"]
+                )
 
-                assets.append({
-                    "asset_id": asset_id,
-                    "name": f"{station['name']} {asset_type.replace('_', ' ').title()} #{i+1}",
-                    "type": asset_type,
-                    "department": dept_name,
-                    "location": {
-                        "station": station["name"],
-                        "station_code": station["code"],
-                        "zone": station["zone"],
-                        "gps": {
-                            "lat": round(49.18 + random.uniform(0, 0.15), 6),
-                            "lng": round(-122.85 - random.uniform(0, 0.20), 6),
+                assets.append(
+                    {
+                        "asset_id": asset_id,
+                        "name": f"{station['name']} {asset_type.replace('_', ' ').title()} #{i + 1}",
+                        "type": asset_type,
+                        "department": dept_name,
+                        "location": {
+                            "station": station["name"],
+                            "station_code": station["code"],
+                            "zone": station["zone"],
+                            "gps": {
+                                "lat": round(49.18 + random.uniform(0, 0.15), 6),
+                                "lng": round(-122.85 - random.uniform(0, 0.20), 6),
+                            },
                         },
-                    },
-                    "equipment_code": f"EQ-{dept_name[:3].upper()}-{asset_counter:04d}",
-                    "manufacturer": manufacturer,
-                    "model": f"{manufacturer} {model_suffix}",
-                    "install_date": f"{install_year}-{random.randint(1,12):02d}-{random.randint(1,28):02d}",
-                    "asset_hierarchy": [
-                        f"BCRTC-{station['zone'].replace(' ', '')}",
-                        f"{station['name']}",
-                        f"{dept_name.replace('_', ' ').title()}",
-                        f"{asset_type.replace('_', ' ').title()} #{i+1}",
-                    ],
-                    "last_inspection": last_insp,
-                    "status": status,
-                })
+                        "equipment_code": f"EQ-{dept_name[:3].upper()}-{asset_counter:04d}",
+                        "manufacturer": manufacturer,
+                        "model": f"{manufacturer} {model_suffix}",
+                        "install_date": f"{install_year}-{random.randint(1, 12):02d}-{random.randint(1, 28):02d}",
+                        "asset_hierarchy": [
+                            f"BCRTC-{station['zone'].replace(' ', '')}",
+                            f"{station['name']}",
+                            f"{dept_name.replace('_', ' ').title()}",
+                            f"{asset_type.replace('_', ' ').title()} #{i + 1}",
+                        ],
+                        "last_inspection": last_insp,
+                        "status": status,
+                    }
+                )
 
     return assets
 
@@ -299,6 +419,7 @@ def generate_assets():
 # ============================================================================
 # Work Orders — 150 with realistic distribution
 # ============================================================================
+
 
 def generate_work_orders(assets, eam_codes):
     """Generate 150 work orders linked to assets."""
@@ -333,24 +454,30 @@ def generate_work_orders(assets, eam_codes):
             f"{asset['type'].replace('_', ' ').title()} showing signs of {pc['label'].lower()}",
         ]
 
-        work_orders.append({
-            "wo_id": f"WO-{created.strftime('%Y')}-{i+1:04d}",
-            "asset_id": asset["asset_id"],
-            "status": status,
-            "priority": priority,
-            "problem_code": pc["code"],
-            "fault_code": fc["code"],
-            "action_code": ac["code"],
-            "failure_class": random.choice(["MECHANICAL", "ELECTRICAL", "STRUCTURAL", "ENVIRONMENTAL"]),
-            "description": random.choice(descriptions),
-            "created_by": random.choice(["maintenance-eye-agent", inspector]),
-            "created_at": created.isoformat(),
-            "assigned_to": inspector,
-            "photos": [],
-            "ai_confidence": round(random.uniform(0.65, 0.98), 2) if random.random() > 0.3 else 0.0,
-            "technician_confirmed": status in ("completed", "in_progress"),
-            "notes": [f"Created during inspection on {created.strftime('%Y-%m-%d')}"],
-        })
+        work_orders.append(
+            {
+                "wo_id": f"WO-{created.strftime('%Y')}-{i + 1:04d}",
+                "asset_id": asset["asset_id"],
+                "status": status,
+                "priority": priority,
+                "problem_code": pc["code"],
+                "fault_code": fc["code"],
+                "action_code": ac["code"],
+                "failure_class": random.choice(
+                    ["MECHANICAL", "ELECTRICAL", "STRUCTURAL", "ENVIRONMENTAL"]
+                ),
+                "description": random.choice(descriptions),
+                "created_by": random.choice(["maintenance-eye-agent", inspector]),
+                "created_at": created.isoformat(),
+                "assigned_to": inspector,
+                "photos": [],
+                "ai_confidence": round(random.uniform(0.65, 0.98), 2)
+                if random.random() > 0.3
+                else 0.0,
+                "technician_confirmed": status in ("completed", "in_progress"),
+                "notes": [f"Created during inspection on {created.strftime('%Y-%m-%d')}"],
+            }
+        )
 
     return work_orders
 
@@ -358,6 +485,7 @@ def generate_work_orders(assets, eam_codes):
 # ============================================================================
 # Inspection Records — 40 with findings
 # ============================================================================
+
 
 def generate_inspections(assets, eam_codes):
     """Generate 40 inspection records with findings."""
@@ -390,34 +518,40 @@ def generate_inspections(assets, eam_codes):
                 f"{pc['label']} detected on {asset['type'].replace('_', ' ')} — confidence {random.randint(75, 98)}%",
             ]
 
-            findings.append({
-                "finding_id": f"F-{idx+1:03d}-{f_idx+1}",
-                "description": random.choice(finding_descriptions),
-                "severity": severity,
-                "problem_code": pc["code"],
-                "fault_code": fc["code"],
-                "photo_url": None,
-                "ai_confidence": round(random.uniform(0.70, 0.97), 2),
-                "technician_confirmed": random.random() > 0.2,
-            })
+            findings.append(
+                {
+                    "finding_id": f"F-{idx + 1:03d}-{f_idx + 1}",
+                    "description": random.choice(finding_descriptions),
+                    "severity": severity,
+                    "problem_code": pc["code"],
+                    "fault_code": fc["code"],
+                    "photo_url": None,
+                    "ai_confidence": round(random.uniform(0.70, 0.97), 2),
+                    "technician_confirmed": random.random() > 0.2,
+                }
+            )
 
         condition = random.choices(
             CONDITIONS,
             weights=[0.40, 0.35, 0.20, 0.05],
         )[0]
 
-        next_due = (insp_date + timedelta(days=random.choice([30, 60, 90, 180]))).strftime("%Y-%m-%d")
+        next_due = (insp_date + timedelta(days=random.choice([30, 60, 90, 180]))).strftime(
+            "%Y-%m-%d"
+        )
 
-        inspections.append({
-            "inspection_id": f"INSP-{insp_date.strftime('%Y%m%d')}-{idx+1:03d}",
-            "asset_id": asset["asset_id"],
-            "inspector": inspector,
-            "date": insp_date.strftime("%Y-%m-%d"),
-            "findings": findings,
-            "overall_condition": condition,
-            "next_inspection_due": next_due,
-            "work_orders_created": [],
-        })
+        inspections.append(
+            {
+                "inspection_id": f"INSP-{insp_date.strftime('%Y%m%d')}-{idx + 1:03d}",
+                "asset_id": asset["asset_id"],
+                "inspector": inspector,
+                "date": insp_date.strftime("%Y-%m-%d"),
+                "findings": findings,
+                "overall_condition": condition,
+                "next_inspection_due": next_due,
+                "work_orders_created": [],
+            }
+        )
 
     return inspections
 
@@ -425,6 +559,7 @@ def generate_inspections(assets, eam_codes):
 # ============================================================================
 # Knowledge Base — 25 maintenance procedure entries
 # ============================================================================
+
 
 def generate_knowledge_base():
     """Generate 25 knowledge base entries for maintenance procedures."""
@@ -663,6 +798,7 @@ def generate_knowledge_base():
 # Helper Functions
 # ============================================================================
 
+
 def _get_prefix(dept, asset_type):
     """Get asset ID prefix based on department and type."""
     prefixes = {
@@ -711,6 +847,7 @@ def _pick_code(codes, asset_type):
 # Seed Firestore
 # ============================================================================
 
+
 def seed_collection(collection_name, documents, id_field):
     """Write documents to Firestore collection using batch operations."""
     global db
@@ -727,15 +864,19 @@ def seed_collection(collection_name, documents, id_field):
             batch.set(ref, doc)
         batch.commit()
 
-    print(f"✅")
+    print("✅")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Seed Firestore with synthetic maintenance data")
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Generate and validate data without writing to Firestore")
-    parser.add_argument("--export-json", type=str, default="",
-                        help="Export generated data to a JSON file")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Generate and validate data without writing to Firestore",
+    )
+    parser.add_argument(
+        "--export-json", type=str, default="", help="Export generated data to a JSON file"
+    )
     args = parser.parse_args()
 
     print("=" * 60)
@@ -799,7 +940,7 @@ def main():
         print(f"  ❌ {len(invalid_wo_refs)} work orders reference non-existent assets!")
         errors += 1
     else:
-        print(f"  ✅ All work orders reference valid assets")
+        print("  ✅ All work orders reference valid assets")
 
     # Check all inspections reference valid assets
     invalid_insp_refs = [i for i in inspections if i["asset_id"] not in asset_id_set]
@@ -807,7 +948,7 @@ def main():
         print(f"  ❌ {len(invalid_insp_refs)} inspections reference non-existent assets!")
         errors += 1
     else:
-        print(f"  ✅ All inspections reference valid assets")
+        print("  ✅ All inspections reference valid assets")
 
     # Check departments coverage
     dept_counts = {}
@@ -826,7 +967,9 @@ def main():
     print("📋 Sample data preview:")
     sample_asset = assets[0]
     print(f"  Asset: {sample_asset['asset_id']} — {sample_asset['name']}")
-    print(f"         Dept: {sample_asset['department']}, Station: {sample_asset['location']['station']}")
+    print(
+        f"         Dept: {sample_asset['department']}, Station: {sample_asset['location']['station']}"
+    )
     sample_wo = work_orders[0]
     print(f"  WO:    {sample_wo['wo_id']} — {sample_wo['description'][:60]}...")
     sample_kb = knowledge[0]
@@ -879,7 +1022,7 @@ def main():
     if not args.dry_run:
         emulator = os.getenv("FIRESTORE_EMULATOR_HOST")
         if emulator:
-            print(f"🖥️  View data at: http://localhost:4000/firestore")
+            print("🖥️  View data at: http://localhost:4000/firestore")
     print("=" * 60)
 
 

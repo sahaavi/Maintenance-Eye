@@ -1,9 +1,6 @@
-
 import asyncio
 import functools
 import logging
-from contextvars import ContextVar
-from typing import Any, Callable, Optional
 
 logger = logging.getLogger("maintenance-eye.tools.wrapper")
 
@@ -11,18 +8,22 @@ logger = logging.getLogger("maintenance-eye.tools.wrapper")
 # Map: session_id -> asyncio.Queue
 _tool_result_queues: dict[str, asyncio.Queue] = {}
 
+
 def get_tool_result_queue(session_id: str) -> asyncio.Queue:
     if session_id not in _tool_result_queues:
         _tool_result_queues[session_id] = asyncio.Queue()
     return _tool_result_queues[session_id]
 
+
 def remove_tool_result_queue(session_id: str):
     _tool_result_queues.pop(session_id, None)
+
 
 def tool_wrapper(func):
     """
     Decorator to wrap ADK tools and capture their results for the WebSocket side-channel.
     """
+
     @functools.wraps(func)
     async def async_wrapper(*args, **kwargs):
         result = await func(*args, **kwargs)
@@ -39,6 +40,7 @@ def tool_wrapper(func):
     async def _capture_result(result):
         # Import here to avoid circular imports
         from agent.tools.confirm_action import _get_session_context
+
         session_id = _get_session_context()
         if session_id and session_id != "default":
             queue = get_tool_result_queue(session_id)

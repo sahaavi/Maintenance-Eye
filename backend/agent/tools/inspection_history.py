@@ -19,6 +19,7 @@ def _status_value(status: object) -> str:
 
 from agent.tools.wrapper import tool_wrapper
 
+
 @tool_wrapper
 async def get_inspection_history(
     asset_id: str,
@@ -51,7 +52,7 @@ async def get_inspection_history(
         inspections = await eam.get_inspection_history(asset_id, limit=limit)
         results["inspections"] = [i.model_dump() for i in inspections]
         results["inspection_count"] = len(inspections)
-        
+
         # Identify recurring issues from inspections
         fault_counts: dict[str, int] = {}
         for insp in inspections:
@@ -72,7 +73,7 @@ async def get_inspection_history(
     try:
         work_orders = await eam.get_work_orders(asset_id=asset_id)
         results["total_work_orders"] = len(work_orders)
-        
+
         open_wos = [
             wo for wo in work_orders if _status_value(wo.status) in OPEN_WORK_ORDER_STATUSES
         ]

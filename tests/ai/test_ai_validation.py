@@ -3,9 +3,12 @@ from __future__ import annotations
 import re
 
 import pytest
-
 from agent.prompts import CHAT_SYSTEM_PROMPT, SYSTEM_PROMPT  # type: ignore[import-not-found]
-from agent.tools.confirm_action import check_pending_actions, propose_action, set_session_context  # type: ignore[import-not-found]
+from agent.tools.confirm_action import (  # type: ignore[import-not-found]
+    check_pending_actions,
+    propose_action,
+    set_session_context,
+)
 
 
 @pytest.mark.ai

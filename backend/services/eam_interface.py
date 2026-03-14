@@ -5,23 +5,22 @@ Hackathon uses FirestoreEAM; production would swap in HexagonEAM.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 from models.schemas import (
     Asset,
-    WorkOrder,
-    WorkOrderStatus,
+    CorrectionLog,
     EAMCode,
     InspectionRecord,
     KnowledgeBaseEntry,
-    CorrectionLog,
+    WorkOrder,
+    WorkOrderStatus,
 )
 
 
 class EAMService(ABC):
     """
     Abstract base class for Enterprise Asset Management operations.
-    
+
     Implementations:
     - FirestoreEAM: Uses Firestore with synthetic data (hackathon)
     - HexagonEAM: Connects to real Hexagon EAM API (production)
@@ -29,7 +28,7 @@ class EAMService(ABC):
 
     # --- Asset Operations ---
     @abstractmethod
-    async def get_asset(self, asset_id: str) -> Optional[Asset]:
+    async def get_asset(self, asset_id: str) -> Asset | None:
         """Look up an asset by its ID."""
         ...
 
@@ -46,7 +45,7 @@ class EAMService(ABC):
 
     # --- Work Order Operations ---
     @abstractmethod
-    async def get_work_order(self, wo_id: str) -> Optional[WorkOrder]:
+    async def get_work_order(self, wo_id: str) -> WorkOrder | None:
         """Look up a single work order by its ID."""
         ...
 
@@ -56,9 +55,7 @@ class EAMService(ABC):
         ...
 
     @abstractmethod
-    async def update_work_order(
-        self, wo_id: str, updates: dict
-    ) -> Optional[WorkOrder]:
+    async def update_work_order(self, wo_id: str, updates: dict) -> WorkOrder | None:
         """Update an existing work order."""
         ...
 
@@ -66,7 +63,7 @@ class EAMService(ABC):
     async def get_work_orders(
         self,
         asset_id: str = "",
-        status: Optional[WorkOrderStatus] = None,
+        status: WorkOrderStatus | None = None,
     ) -> list[WorkOrder]:
         """Get work orders, optionally filtered by asset and status."""
         ...
@@ -77,7 +74,7 @@ class EAMService(ABC):
         q: str = "",
         priority: str = "",
         department: str = "",
-        status: Optional[WorkOrderStatus] = None,
+        status: WorkOrderStatus | None = None,
         location: str = "",
     ) -> list[WorkOrder]:
         """Search work orders with full-text query across wo_id, description,
@@ -130,8 +127,6 @@ class EAMService(ABC):
         ...
 
     @abstractmethod
-    async def get_corrections(
-        self, asset_id: str = "", code_type: str = ""
-    ) -> list[CorrectionLog]:
+    async def get_corrections(self, asset_id: str = "", code_type: str = "") -> list[CorrectionLog]:
         """Get past corrections for learning context."""
         ...

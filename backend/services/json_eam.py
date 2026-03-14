@@ -6,27 +6,25 @@ Supports reads from seed data and in-memory writes for work orders.
 
 import json
 import logging
-import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from models.schemas import (
     Asset,
-    WorkOrder,
-    Priority,
-    WorkOrderStatus,
+    CorrectionLog,
     EAMCode,
     InspectionRecord,
     KnowledgeBaseEntry,
-    CorrectionLog,
+    WorkOrder,
+    WorkOrderStatus,
 )
-from services.eam_interface import EAMService
+from services.base_eam import BaseEAMService
+from services.search_matcher import query_matches_text
 
 logger = logging.getLogger("maintenance-eye.json-eam")
 
 
-def _resolve_seed_path() -> Optional[Path]:
+def _resolve_seed_path() -> Path | None:
     here = Path(__file__).resolve()
     candidates = [
         here.parent.parent.parent / "data" / "seed_data.json",
@@ -40,7 +38,7 @@ def _resolve_seed_path() -> Optional[Path]:
     return None
 
 
-class JsonEAM(EAMService):
+class JsonEAM(BaseEAMService):
     """
     In-memory EAM service backed by seed_data.json.
     Reads are from seed data; writes (work orders, inspections) are stored in memory.
@@ -49,7 +47,7 @@ class JsonEAM(EAMService):
     def __init__(self):
         path = _resolve_seed_path()
         if path:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 raw = json.load(f)
             logger.info(f"JsonEAM loaded seed data from {path}")
         else:
@@ -72,7 +70,7 @@ class JsonEAM(EAMService):
 
     # --- Asset Operations ---
 
-    async def get_asset(self, asset_id: str) -> Optional[Asset]:
+    async def get_asset(self, asset_id: str) -> Asset | None:
         data = self._assets.get(asset_id)
         if data:
             return Asset(**data)
@@ -96,29 +94,15 @@ class JsonEAM(EAMService):
                 if station.lower() not in loc.get("station", "").lower():
                     continue
             if query:
-                searchable = " ".join([
-                    a.get("name", ""),
-                    a.get("asset_id", ""),
-                    a.get("type", ""),
-                    a.get("department", ""),
-                    a.get("equipment_code", ""),
-                    a.get("manufacturer", ""),
-                    a.get("model", ""),
-                    a.get("location", {}).get("station", ""),
-                    a.get("location", {}).get("station_code", ""),
-                    a.get("location", {}).get("zone", ""),
-                    " ".join(a.get("asset_hierarchy", [])),
-                ]).lower()
-                # Tokenized matching: all query words must appear in searchable text
-                query_tokens = re.findall(r"[a-zA-Z0-9]+", query.lower())
-                if not all(token in searchable for token in query_tokens):
+                searchable = self.build_asset_searchable(a)
+                if not query_matches_text(query, searchable):
                     continue
             results.append(Asset(**a))
         return results
 
     # --- Work Order Operations ---
 
-    async def get_work_order(self, wo_id: str) -> Optional[WorkOrder]:
+    async def get_work_order(self, wo_id: str) -> WorkOrder | None:
         data = self._work_orders.get(wo_id)
         if data:
             return WorkOrder(**data)
@@ -132,25 +116,11 @@ class JsonEAM(EAMService):
         logger.info(f"Created work order (in-memory): {work_order.wo_id}")
         return work_order
 
-    async def update_work_order(
-        self, wo_id: str, updates: dict
-    ) -> Optional[WorkOrder]:
+    async def update_work_order(self, wo_id: str, updates: dict) -> WorkOrder | None:
         if wo_id not in self._work_orders:
             return None
         data = self._work_orders[wo_id]
-        normalized_updates = dict(updates)
-        if "status" in normalized_updates:
-            value = normalized_updates["status"]
-            normalized_updates["status"] = (
-                value.value if isinstance(value, WorkOrderStatus)
-                else WorkOrderStatus(str(value).lower()).value
-            )
-        if "priority" in normalized_updates:
-            value = normalized_updates["priority"]
-            normalized_updates["priority"] = (
-                value.value if isinstance(value, Priority)
-                else Priority(str(value).upper()).value
-            )
+        normalized_updates = self.normalize_work_order_updates(updates)
         for key, value in normalized_updates.items():
             if key == "notes" and isinstance(value, list):
                 data.setdefault("notes", []).extend(value)
@@ -163,7 +133,7 @@ class JsonEAM(EAMService):
     async def get_work_orders(
         self,
         asset_id: str = "",
-        status: Optional[WorkOrderStatus] = None,
+        status: WorkOrderStatus | None = None,
     ) -> list[WorkOrder]:
         results = []
         for wo in self._work_orders.values():
@@ -179,25 +149,12 @@ class JsonEAM(EAMService):
         q: str = "",
         priority: str = "",
         department: str = "",
-        status: Optional[WorkOrderStatus] = None,
+        status: WorkOrderStatus | None = None,
         location: str = "",
     ) -> list[WorkOrder]:
-        # Build a set of asset_ids that match the location filter
-        location_asset_ids: set[str] | None = None
-        if location:
-            loc_lower = location.lower()
-            location_asset_ids = {
-                aid for aid, a in self._assets.items()
-                if loc_lower in a.get("location", {}).get("station", "").lower()
-            }
-
-        # Build a set of asset_ids that match the department filter
-        dept_asset_ids: set[str] | None = None
-        if department:
-            dept_asset_ids = {
-                aid for aid, a in self._assets.items()
-                if a.get("department") == department
-            }
+        location_asset_ids, dept_asset_ids = self.resolve_location_dept_filters(
+            iter(self._assets.values()), location, department
+        )
 
         results = []
         for wo in self._work_orders.values():
@@ -205,7 +162,7 @@ class JsonEAM(EAMService):
                 continue
             if priority and wo.get("priority", "").upper() != priority.upper():
                 continue
-            
+
             aid = wo.get("asset_id", "")
             asset = self._assets.get(aid, {})
 
@@ -214,42 +171,14 @@ class JsonEAM(EAMService):
             if dept_asset_ids is not None and aid not in dept_asset_ids:
                 continue
             if q:
-                searchable = " ".join([
-                    wo.get("wo_id", "") or "",
-                    wo.get("description", "") or "",
-                    aid or "",
-                    asset.get("name", "") or "",
-                    asset.get("location", {}).get("station", "") or "",
-                    wo.get("problem_code", "") or "",
-                    wo.get("fault_code", "") or "",
-                    wo.get("action_code", "") or "",
-                    wo.get("assigned_to", "") or "",
-                    wo.get("equipment_id", "") or "",
-                ]).lower()
-                # Tokenized matching: all query words must appear
-                query_tokens = re.findall(r"[a-zA-Z0-9]+", q.lower())
-                if not all(token in searchable for token in query_tokens):
+                searchable = self.build_wo_searchable(wo, asset)
+                if not query_matches_text(q, searchable):
                     continue
             results.append(WorkOrder(**wo))
         return results
 
     async def get_locations(self) -> list[dict]:
-        stations: dict[str, dict] = {}
-        for a in self._assets.values():
-            loc = a.get("location", {})
-            station = loc.get("station", "")
-            if not station:
-                continue
-            key = station
-            if key not in stations:
-                stations[key] = {
-                    "station": station,
-                    "station_code": loc.get("station_code", ""),
-                    "zone": loc.get("zone", ""),
-                    "asset_count": 0,
-                }
-            stations[key]["asset_count"] += 1
-        return sorted(stations.values(), key=lambda s: s["station"])
+        return self.aggregate_stations(iter(self._assets.values()))
 
     # --- EAM Code Operations ---
 
@@ -288,34 +217,19 @@ class JsonEAM(EAMService):
 
     # --- Knowledge Base ---
 
-    # Words that describe document type, not content — strip from KB queries
-    _KB_META_WORDS = frozenset({
-        "protocol", "procedure", "manual", "guide", "guidelines", "standard",
-        "standards", "document", "checklist", "instructions", "handbook",
-        "specification", "reference", "sop",
-    })
-
     async def search_knowledge_base(
         self, query: str, asset_type: str = "", department: str = ""
     ) -> list[KnowledgeBaseEntry]:
         results = []
+        query_tokens = self.tokenize_kb_query(query) if query else []
         for k in self._knowledge_base:
             if department and k.get("department") != department:
                 continue
             if asset_type and asset_type not in k.get("asset_types", []):
                 continue
-            if query:
-                searchable = f"{k.get('title','')} {k.get('content','')} {' '.join(k.get('tags',[]))}".lower()
-                # Strip document-type meta words from query before matching
-                query_tokens = [
-                    t for t in re.findall(r"[a-zA-Z0-9]+", query.lower())
-                    if t not in self._KB_META_WORDS
-                ]
-                if not query_tokens:
-                    # Query was entirely meta words — match all entries
-                    results.append(KnowledgeBaseEntry(**k))
-                    continue
-                if not all(token in searchable for token in query_tokens):
+            if query_tokens:
+                searchable = f"{k.get('title', '')} {k.get('content', '')} {' '.join(k.get('tags', []))}".lower()
+                if not self.kb_tokens_match(query_tokens, searchable):
                     continue
             results.append(KnowledgeBaseEntry(**k))
         return results
@@ -325,9 +239,7 @@ class JsonEAM(EAMService):
     async def log_correction(self, correction: CorrectionLog) -> None:
         self._corrections.append(correction.model_dump())
 
-    async def get_corrections(
-        self, asset_id: str = "", code_type: str = ""
-    ) -> list[CorrectionLog]:
+    async def get_corrections(self, asset_id: str = "", code_type: str = "") -> list[CorrectionLog]:
         results = []
         for c in self._corrections:
             if asset_id and c.get("asset_id") != asset_id:

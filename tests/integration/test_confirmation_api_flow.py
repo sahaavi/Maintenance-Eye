@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import pytest
-
-from services.confirmation_manager import ActionType, get_confirmation_manager  # type: ignore[import-not-found]
+from services.confirmation_manager import (  # type: ignore[import-not-found]
+    ActionType,
+    get_confirmation_manager,
+)
 
 
 @pytest.mark.integration
@@ -21,7 +23,9 @@ def test_confirmation_http_flow_confirm(client) -> None:
     assert pending.status_code == 200
     assert pending.json()["pending_count"] == 1
 
-    confirm = client.post(f"/api/sessions/{session_id}/confirm/{proposed.action_id}", params={"notes": "confirmed"})
+    confirm = client.post(
+        f"/api/sessions/{session_id}/confirm/{proposed.action_id}", params={"notes": "confirmed"}
+    )
     assert confirm.status_code == 200
     body = confirm.json()
     assert body["status"] == "confirmed"

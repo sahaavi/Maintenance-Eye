@@ -15,38 +15,36 @@ Supports:
   - Barge-in / interruption (handled natively by Live API)
 """
 
+import ast
 import asyncio
-import traceback
 import base64
 import json
-import ast
 import logging
 import time
+import traceback
 from datetime import datetime
-from typing import Optional
 
+from agent.tools.confirm_action import set_session_context
+from agent.tools.work_order import manage_work_order
+from agent.tools.wrapper import get_tool_result_queue, remove_tool_result_queue
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
-from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.agents.live_request_queue import LiveRequestQueue
+from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
-
+from services.auth_service import require_auth_websocket
 from services.confirmation_manager import (
+    ActionType,
+    PendingAction,
     get_confirmation_manager,
     remove_confirmation_manager,
 )
-from services.auth_service import require_auth_websocket
 from services.storage_service import get_storage_service
-from agent.tools.confirm_action import set_session_context
-from agent.tools.wrapper import get_tool_result_queue, remove_tool_result_queue
-from services.confirmation_manager import PendingAction, ActionType
-from agent.tools.work_order import manage_work_order
 
 router = APIRouter()
 logger = logging.getLogger("maintenance-eye.websocket")
 
 # Audio configuration
-SEND_SAMPLE_RATE = 16000   # Phone → server (PCM 16kHz mono 16-bit)
+SEND_SAMPLE_RATE = 16000  # Phone → server (PCM 16kHz mono 16-bit)
 RECEIVE_SAMPLE_RATE = 24000  # Server → phone (PCM 24kHz mono 16-bit)
 
 
@@ -61,7 +59,7 @@ class InspectionSession:
         self.user_id = user_id
         self.websocket = websocket
         self.is_active = True
-        self.current_asset_id: Optional[str] = None
+        self.current_asset_id: str | None = None
         self.findings: list[dict] = []
         self.last_frame_upload_at: float = 0.0
         self.frame_upload_interval_seconds: float = 30.0
@@ -74,17 +72,20 @@ class InspectionSession:
 active_sessions: dict[str, InspectionSession] = {}
 
 
-def _extract_confirmation_request(tool_result: object) -> Optional[dict]:
+def _extract_confirmation_request(tool_result: object) -> dict | None:
     """
     Extract confirmation payload from ADK tool results.
     """
     queue: list[object] = [tool_result]
     while queue:
         current = queue.pop(0)
-        if current is None: continue
+        if current is None:
+            continue
         if hasattr(current, "model_dump") and callable(current.model_dump):
-            try: current = current.model_dump()
-            except Exception: pass
+            try:
+                current = current.model_dump()
+            except Exception:
+                pass
 
         if isinstance(current, dict):
             if "action_id" in current and "confirmation_prompt" in current:
@@ -105,34 +106,77 @@ def _extract_media_cards(tool_result: object) -> list[dict]:
     queue: list[object] = [tool_result]
     while queue:
         current = queue.pop(0)
-        if current is None: continue
+        if current is None:
+            continue
         if hasattr(current, "model_dump") and callable(current.model_dump):
-            try: current = current.model_dump()
-            except Exception: pass
+            try:
+                current = current.model_dump()
+            except Exception:
+                pass
 
         if isinstance(current, dict):
+            # Smart-search summary: explicit no-result feedback card.
+            if (
+                "intent" in current
+                and "total" in current
+                and "results" in current
+                and isinstance(current.get("results"), list)
+                and int(current.get("total", 0)) == 0
+            ):
+                cards.append(
+                    {
+                        "title": "No Matching Records",
+                        "description": (
+                            "Search returned no assets/work orders for that query. "
+                            "Try asset tag, alternate name, or station + subsystem."
+                        ),
+                        "image_url": "https://api.dicebear.com/7.x/identicon/svg?seed=no-results",
+                    }
+                )
             # Check for KnowledgeBaseEntry-like shapes
             if "title" in current and "content" in current and "asset_types" in current:
-                cards.append({
-                    "title": current.get("title"),
-                    "description": current.get("content")[:200] + "...",
-                    "image_url": f"https://api.dicebear.com/7.x/identicon/svg?seed={current.get('title')}", # Placeholder for doc icon
-                })
+                cards.append(
+                    {
+                        "title": current.get("title"),
+                        "description": current.get("content")[:200] + "...",
+                        "image_url": f"https://api.dicebear.com/7.x/identicon/svg?seed={current.get('title')}",  # Placeholder for doc icon
+                    }
+                )
+            # Check for WorkOrder-like shapes
+            elif "wo_id" in current and "asset_id" in current and "description" in current:
+                status = str(current.get("status", "unknown")).replace("_", " ").title()
+                priority = current.get("priority", "")
+                description = (current.get("description", "") or "")[:180]
+                cards.append(
+                    {
+                        "title": f"Work Order: {current.get('wo_id')}",
+                        "description": (
+                            f"Asset: {current.get('asset_id')} | Status: {status}"
+                            + (f" | Priority: {priority}" if priority else "")
+                            + (f"\n{description}" if description else "")
+                        ),
+                        "image_url": f"https://api.dicebear.com/7.x/identicon/svg?seed={current.get('wo_id')}",
+                    }
+                )
             # Check for Asset-like shapes
             elif "asset_id" in current and "name" in current and "type" in current:
-                cards.append({
-                    "title": f"Asset: {current.get('name')}",
-                    "description": f"ID: {current.get('asset_id')} | Status: {current.get('status')}",
-                    "image_url": f"https://api.dicebear.com/7.x/shapes/svg?seed={current.get('asset_id')}", # Placeholder
-                })
+                cards.append(
+                    {
+                        "title": f"Asset: {current.get('name')}",
+                        "description": f"ID: {current.get('asset_id')} | Status: {current.get('status')}",
+                        "image_url": f"https://api.dicebear.com/7.x/shapes/svg?seed={current.get('asset_id')}",  # Placeholder
+                    }
+                )
             # Check for Report-like shapes
             elif "report_id" in current and "overall_condition" in current:
-                cards.append({
-                    "title": f"Inspection Report: {current.get('report_id')}",
-                    "description": f"Condition: {current.get('overall_condition').replace('_', ' ').title()}",
-                    "image_url": "https://api.dicebear.com/7.x/identicon/svg?seed=report", # Doc icon
-                    "action_link": f"/api/reports/{current.get('report_id')}/pdf",
-                })
+                cards.append(
+                    {
+                        "title": f"Inspection Report: {current.get('report_id')}",
+                        "description": f"Condition: {current.get('overall_condition').replace('_', ' ').title()}",
+                        "image_url": "https://api.dicebear.com/7.x/identicon/svg?seed=report",  # Doc icon
+                        "action_link": f"/api/reports/{current.get('report_id')}/pdf",
+                    }
+                )
             queue.extend(current.values())
             continue
         if isinstance(current, (list, tuple)):
@@ -221,7 +265,9 @@ async def _execute_confirmed_action(action: PendingAction) -> dict:
             action="update",
             wo_id=payload.get("wo_id", ""),
             status="completed",
-            notes=payload.get("notes", action.technician_notes or "Closed by technician confirmation"),
+            notes=payload.get(
+                "notes", action.technician_notes or "Closed by technician confirmation"
+            ),
         )
 
     if action_type == ActionType.ESCALATE_PRIORITY:
@@ -229,7 +275,9 @@ async def _execute_confirmed_action(action: PendingAction) -> dict:
             action="update",
             wo_id=payload.get("wo_id", ""),
             priority=payload.get("priority", ""),
-            notes=payload.get("notes", action.technician_notes or "Priority escalated by technician confirmation"),
+            notes=payload.get(
+                "notes", action.technician_notes or "Priority escalated by technician confirmation"
+            ),
         )
 
     return {
@@ -241,7 +289,7 @@ async def _execute_confirmed_action(action: PendingAction) -> dict:
 async def _upload_session_frame(
     session_id: str,
     frame_data: bytes,
-) -> Optional[str]:
+) -> str | None:
     """Persist a frame snapshot to GCS for traceability."""
     storage = get_storage_service()
     if not storage.enabled:
@@ -260,15 +308,13 @@ async def _upload_work_order_artifact(
     session_id: str,
     action_id: str,
     execution_result: dict,
-) -> Optional[str]:
+) -> str | None:
     """Persist confirmed work-order payload to GCS for audit traceability."""
     storage = get_storage_service()
     if not storage.enabled:
         return None
     timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
-    object_path = (
-        f"sessions/{session_id}/work_orders/{timestamp}-{action_id}.json"
-    )
+    object_path = f"sessions/{session_id}/work_orders/{timestamp}-{action_id}.json"
     return await storage.upload_json(execution_result, object_path)
 
 
@@ -283,7 +329,7 @@ async def _run_bidi_session(
     Manages: session lifecycle, upstream (client→ADK), downstream (ADK→client),
     human-in-the-loop confirmation flow, and teardown.
     """
-    from main import runner, session_service, APP_NAME
+    from main import APP_NAME, runner, session_service
 
     session = InspectionSession(session_id, resolved_user_id, websocket)
     active_sessions[session_id] = session
@@ -309,11 +355,13 @@ async def _run_bidi_session(
 
     live_request_queue = LiveRequestQueue()
 
-    await websocket.send_json({
-        "type": "status",
-        "data": "Connected to Maintenance-Eye. Live API ready.",
-        "session_id": session_id,
-    })
+    await websocket.send_json(
+        {
+            "type": "status",
+            "data": "Connected to Maintenance-Eye. Live API ready.",
+            "session_id": session_id,
+        }
+    )
 
     async def upstream_task() -> None:
         """
@@ -340,9 +388,11 @@ async def _run_bidi_session(
                     # Send asset context as text to the agent
                     if session.current_asset_id:
                         content = types.Content(
-                            parts=[types.Part(
-                                text=f"The technician is now inspecting asset: {session.current_asset_id}"
-                            )]
+                            parts=[
+                                types.Part(
+                                    text=f"The technician is now inspecting asset: {session.current_asset_id}"
+                                )
+                            ]
                         )
                         live_request_queue.send_content(content)
 
@@ -372,133 +422,24 @@ async def _run_bidi_session(
 
                 elif msg_type == "text":
                     # Send text message to agent
-                    content = types.Content(
-                        parts=[types.Part(text=message["data"])]
-                    )
+                    content = types.Content(parts=[types.Part(text=message["data"])])
                     live_request_queue.send_content(content)
 
                 # -----------------------------------------------------------
                 # Human-in-the-Loop: confirmation responses
                 # -----------------------------------------------------------
-                elif msg_type == "confirm":
-                    action_id = payload.get("action_id") or message.get("action_id", "")
-                    notes = payload.get("notes") or message.get("notes", "")
-                    action = confirmation_mgr.confirm(action_id, notes)
-                    if action:
-                        execution = await _execute_confirmed_action(action)
-                        # Tell the agent the action was already executed by the system
-                        wo_id = ""
-                        if execution.get("success") and execution.get("work_order"):
-                            wo_id = execution["work_order"].get("wo_id", "")
-                        content = types.Content(
-                            parts=[types.Part(
-                                text=f"[SYSTEM] Action {action_id} was CONFIRMED and ALREADY EXECUTED by the system. "
-                                     f"{'Work order ' + wo_id + ' was created. ' if wo_id else ''}"
-                                     f"Do NOT call manage_work_order again — the action is complete. "
-                                     f"Just acknowledge the result to the technician briefly."
-                            )]
-                        )
-                        live_request_queue.send_content(content)
-                        await websocket.send_json({
-                            "type": "confirmation_result",
-                            "data": {
-                                "action_id": action_id,
-                                "status": "confirmed",
-                                "execution": execution,
-                            },
-                        })
-                        if execution.get("success") and execution.get("work_order"):
-                            artifact_uri = await _upload_work_order_artifact(
-                                session_id=session_id,
-                                action_id=action_id,
-                                execution_result=execution,
-                            )
-                            if artifact_uri:
-                                logger.debug(f"Stored work-order artifact: {artifact_uri}")
-                            await websocket.send_json({
-                                "type": "work_order",
-                                "data": execution.get("work_order"),
-                            })
-                    else:
-                        await websocket.send_json({
-                            "type": "error",
-                            "data": f"Unknown action_id: {action_id}",
-                        })
+                elif msg_type in ("confirm", "reject", "correct"):
+                    from api.websocket_helpers import handle_confirmation_message
 
-                elif msg_type == "reject":
-                    action_id = payload.get("action_id") or message.get("action_id", "")
-                    notes = payload.get("notes") or message.get("notes", "")
-                    action = confirmation_mgr.reject(action_id, notes)
-                    if action:
-                        content = types.Content(
-                            parts=[types.Part(
-                                text=f"[SYSTEM] The technician REJECTED action {action_id}. "
-                                     f"Reason: {notes or 'No reason given'}. "
-                                     f"Acknowledge briefly and ask if they want a different approach."
-                            )]
-                        )
-                        live_request_queue.send_content(content)
-                        await websocket.send_json({
-                            "type": "confirmation_result",
-                            "data": {
-                                "action_id": action_id,
-                                "status": "rejected",
-                            },
-                        })
-                    else:
-                        await websocket.send_json({
-                            "type": "error",
-                            "data": f"Unknown action_id: {action_id}",
-                        })
-
-                elif msg_type == "correct":
-                    action_id = payload.get("action_id") or message.get("action_id", "")
-                    corrections = payload.get("corrections")
-                    if not isinstance(corrections, dict):
-                        corrections = message.get("corrections", {})
-                    if not isinstance(corrections, dict):
-                        corrections = {}
-                    notes = payload.get("notes") or message.get("notes", "")
-                    action = confirmation_mgr.correct(action_id, corrections, notes)
-                    if action:
-                        execution = await _execute_confirmed_action(action)
-                        wo_id = ""
-                        if execution.get("success") and execution.get("work_order"):
-                            wo_id = execution["work_order"].get("wo_id", "")
-                        content = types.Content(
-                            parts=[types.Part(
-                                text=f"[SYSTEM] Action {action_id} was CORRECTED and ALREADY EXECUTED with updated values. "
-                                     f"{'Work order ' + wo_id + ' was created. ' if wo_id else ''}"
-                                     f"Do NOT call manage_work_order again. Just acknowledge briefly."
-                            )]
-                        )
-                        live_request_queue.send_content(content)
-                        await websocket.send_json({
-                            "type": "confirmation_result",
-                            "data": {
-                                "action_id": action_id,
-                                "status": "corrected",
-                                "corrected_data": action.proposed_data,
-                                "execution": execution,
-                            },
-                        })
-                        if execution.get("success") and execution.get("work_order"):
-                            artifact_uri = await _upload_work_order_artifact(
-                                session_id=session_id,
-                                action_id=action_id,
-                                execution_result=execution,
-                            )
-                            if artifact_uri:
-                                logger.debug(f"Stored work-order artifact: {artifact_uri}")
-                            await websocket.send_json({
-                                "type": "work_order",
-                                "data": execution.get("work_order"),
-                            })
-                    else:
-                        await websocket.send_json({
-                            "type": "error",
-                            "data": f"Unknown action_id: {action_id}",
-                        })
+                    await handle_confirmation_message(
+                        msg_type=msg_type,
+                        payload=payload,
+                        message=message,
+                        confirmation_mgr=confirmation_mgr,
+                        session_id=session_id,
+                        live_request_queue=live_request_queue,
+                        websocket=websocket,
+                    )
 
                 else:
                     logger.warning(f"Unknown message type: {msg_type}")
@@ -508,10 +449,12 @@ async def _run_bidi_session(
         except Exception as e:
             logger.error(f"Upstream error: {session_id} — {e}\n{traceback.format_exc()}")
             try:
-                await websocket.send_json({
-                    "type": "error",
-                    "data": f"Upstream error: {str(e)}",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "data": f"Upstream error: {e!s}",
+                    }
+                )
             except Exception:
                 pass
 
@@ -521,7 +464,7 @@ async def _run_bidi_session(
         Events include: audio chunks, text, transcriptions, tool calls, etc.
         Also listens to a side-channel queue for tool results.
         """
-        
+
         # Helper task to pull from tool result side-channel
         async def side_channel_task():
             try:
@@ -529,28 +472,24 @@ async def _run_bidi_session(
                     try:
                         tool_result = await asyncio.wait_for(tool_queue.get(), timeout=1.0)
                         logger.debug(f"Side channel received tool result: {tool_result}")
-                        
+
                         # Process confirmation requests
                         confirmation_payload = _extract_confirmation_request(tool_result)
                         if confirmation_payload:
-                            logger.info(f"Sending confirmation_request to WebSocket: {confirmation_payload.get('action_id')}")
-                            await websocket.send_json({
-                                "type": "confirmation_request",
-                                "data": confirmation_payload,
-                            })
+                            logger.info(
+                                f"Sending confirmation_request to WebSocket: {confirmation_payload.get('action_id')}"
+                            )
+                            await websocket.send_json(
+                                {
+                                    "type": "confirmation_request",
+                                    "data": confirmation_payload,
+                                }
+                            )
                         else:
                             logger.debug("Tool result did not contain a confirmation request")
-                        
-                        # Forward other results as media cards
-                        cards = _extract_media_cards(tool_result)
-                        for card in cards:
-                            await websocket.send_json({
-                                "type": "media_card",
-                                "data": card,
-                            })
-                        
+
                         tool_queue.task_done()
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         continue
             except Exception as e:
                 logger.error(f"Side channel error: {e}")
@@ -572,58 +511,71 @@ async def _run_bidi_session(
                     for part in event.content.parts:
                         # Audio data
                         if part.inline_data and part.inline_data.data:
-                            audio_b64 = base64.b64encode(
-                                part.inline_data.data
-                            ).decode("utf-8")
-                            await websocket.send_json({
-                                "type": "audio",
-                                "data": audio_b64,
-                                "mime_type": part.inline_data.mime_type or f"audio/pcm;rate={RECEIVE_SAMPLE_RATE}",
-                            })
+                            audio_b64 = base64.b64encode(part.inline_data.data).decode("utf-8")
+                            await websocket.send_json(
+                                {
+                                    "type": "audio",
+                                    "data": audio_b64,
+                                    "mime_type": part.inline_data.mime_type
+                                    or f"audio/pcm;rate={RECEIVE_SAMPLE_RATE}",
+                                }
+                            )
 
                         # Text: transcription fragments or model reasoning
                         elif part.text:
                             if getattr(event, "partial", False):
                                 # Partial = live transcription fragment (word-by-word)
                                 role = getattr(event.content, "role", "model")
-                                msg_type = "transcript_input" if role == "user" else "transcript_output"
+                                msg_type = (
+                                    "transcript_input" if role == "user" else "transcript_output"
+                                )
                                 text = part.text
                                 # Filter out model thinking/reasoning from transcripts.
                                 # Gemini sometimes speaks its thought process aloud—
                                 # strip bold markdown headers that indicate thinking.
-                                if msg_type == "transcript_output" and text.strip().startswith("**"):
+                                if msg_type == "transcript_output" and text.strip().startswith(
+                                    "**"
+                                ):
                                     continue
-                                await websocket.send_json({
-                                    "type": msg_type,
-                                    "data": text,
-                                })
+                                await websocket.send_json(
+                                    {
+                                        "type": msg_type,
+                                        "data": text,
+                                    }
+                                )
                             # Non-partial text in live audio mode = model internal
                             # reasoning/thinking (not speech). Suppress it — the
                             # agent communicates via audio, not text bubbles.
 
                 # --- Turn complete ---
                 if getattr(event, "turn_complete", False):
-                    await websocket.send_json({
-                        "type": "turn_complete",
-                        "data": "",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "turn_complete",
+                            "data": "",
+                        }
+                    )
 
                 # --- Interruption (barge-in) ---
                 if getattr(event, "interrupted", False):
-                    await websocket.send_json({
-                        "type": "interrupted",
-                        "data": "Agent interrupted by user input",
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "interrupted",
+                            "data": "Agent interrupted by user input",
+                        }
+                    )
 
         except WebSocketDisconnect:
             logger.info(f"Client disconnected (downstream): {session_id}")
         except Exception as e:
             logger.error(f"Downstream error: {session_id} — {e}\n{traceback.format_exc()}")
             try:
-                await websocket.send_json({
-                    "type": "error",
-                    "data": f"Live API error: {str(e)}",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "error",
+                        "data": f"Live API error: {e!s}",
+                    }
+                )
             except Exception:
                 pass
         finally:
@@ -658,14 +610,16 @@ async def _run_bidi_session(
         stats = remove_confirmation_manager(session_id)
 
         try:
-            await websocket.send_json({
-                "type": "session_summary",
-                "data": {
-                    "session_id": session_id,
-                    "findings_count": len(session.findings),
-                    "confirmation_stats": stats or {},
-                },
-            })
+            await websocket.send_json(
+                {
+                    "type": "session_summary",
+                    "data": {
+                        "session_id": session_id,
+                        "findings_count": len(session.findings),
+                        "confirmation_stats": stats or {},
+                    },
+                }
+            )
         except Exception:
             pass  # Client may already be disconnected
 
@@ -738,7 +692,7 @@ async def chat_websocket(
         return
     await websocket.accept()
 
-    from main import chat_runner, chat_session_service, CHAT_APP_NAME
+    from main import CHAT_APP_NAME, chat_runner, chat_session_service
 
     session_id = f"chat-{id(websocket)}"
     resolved_user_id = auth_ctx.uid if auth_ctx and auth_ctx.uid else user_id
@@ -762,11 +716,13 @@ async def chat_websocket(
             session_id=session_id,
         )
 
-    await websocket.send_json({
-        "type": "status",
-        "data": "Connected to Max (text chat). Ask me anything!",
-        "session_id": session_id,
-    })
+    await websocket.send_json(
+        {
+            "type": "status",
+            "data": "Connected to Max (text chat). Ask me anything!",
+            "session_id": session_id,
+        }
+    )
 
     # Side-channel task for tool results in chat
     async def side_channel_task():
@@ -775,16 +731,12 @@ async def chat_websocket(
                 tool_result = await tool_queue.get()
                 confirmation_payload = _extract_confirmation_request(tool_result)
                 if confirmation_payload:
-                    await websocket.send_json({
-                        "type": "confirmation_request",
-                        "data": confirmation_payload,
-                    })
-                media_cards = _extract_media_cards(tool_result)
-                for card in media_cards:
-                    await websocket.send_json({
-                        "type": "media_card",
-                        "data": card,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "confirmation_request",
+                            "data": confirmation_payload,
+                        }
+                    )
                 tool_queue.task_done()
         except Exception as e:
             logger.error(f"Chat side channel error: {e}")
@@ -809,16 +761,20 @@ async def chat_websocket(
             elif msg_type in ("image", "video"):
                 # Queue image to be sent with the next text message
                 frame_data = base64.b64decode(message["data"])
-                pending_images.append(types.Part(
-                    inline_data=types.Blob(
-                        mime_type="image/jpeg",
-                        data=frame_data,
+                pending_images.append(
+                    types.Part(
+                        inline_data=types.Blob(
+                            mime_type="image/jpeg",
+                            data=frame_data,
+                        )
                     )
-                ))
-                await websocket.send_json({
-                    "type": "status",
-                    "data": "Image received. Send a message to ask about it.",
-                })
+                )
+                await websocket.send_json(
+                    {
+                        "type": "status",
+                        "data": "Image received. Send a message to ask about it.",
+                    }
+                )
 
             elif msg_type == "text":
                 # Build message parts: any queued images + the text
@@ -829,10 +785,12 @@ async def chat_websocket(
 
                 content = types.Content(role="user", parts=parts)
 
-                await websocket.send_json({
-                    "type": "status",
-                    "data": "Thinking...",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "status",
+                        "data": "Thinking...",
+                    }
+                )
 
                 # Run the agent (async, not live streaming)
                 async for event in chat_runner.run_async(
@@ -844,100 +802,45 @@ async def chat_websocket(
                     if event.content and event.content.parts:
                         for part in event.content.parts:
                             if part.text:
-                                await websocket.send_json({
-                                    "type": "text",
-                                    "data": part.text,
-                                })
+                                await websocket.send_json(
+                                    {
+                                        "type": "text",
+                                        "data": part.text,
+                                    }
+                                )
 
-                await websocket.send_json({
-                    "type": "status",
-                    "data": "Online",
-                })
+                await websocket.send_json(
+                    {
+                        "type": "status",
+                        "data": "Online",
+                    }
+                )
 
             # --- Human-in-the-Loop: confirmation responses ---
-            elif msg_type == "confirm":
-                action_id = payload.get("action_id") or message.get("action_id", "")
-                notes = payload.get("notes") or message.get("notes", "")
-                action = confirmation_mgr.confirm(action_id, notes)
-                if action:
-                    execution = await _execute_confirmed_action(action)
-                    await websocket.send_json({
-                        "type": "confirmation_result",
-                        "data": {
-                            "action_id": action_id,
-                            "status": "confirmed",
-                            "execution": execution,
-                        },
-                    })
-                    if execution.get("success") and execution.get("work_order"):
-                        await websocket.send_json({
-                            "type": "work_order",
-                            "data": execution.get("work_order"),
-                        })
-                else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "data": f"Unknown action_id: {action_id}",
-                    })
+            elif msg_type in ("confirm", "reject", "correct"):
+                from api.websocket_helpers import handle_confirmation_message
 
-            elif msg_type == "reject":
-                action_id = payload.get("action_id") or message.get("action_id", "")
-                notes = payload.get("notes") or message.get("notes", "")
-                action = confirmation_mgr.reject(action_id, notes)
-                if action:
-                    await websocket.send_json({
-                        "type": "confirmation_result",
-                        "data": {
-                            "action_id": action_id,
-                            "status": "rejected",
-                        },
-                    })
-                else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "data": f"Unknown action_id: {action_id}",
-                    })
-
-            elif msg_type == "correct":
-                action_id = payload.get("action_id") or message.get("action_id", "")
-                corrections = payload.get("corrections")
-                if not isinstance(corrections, dict):
-                    corrections = message.get("corrections", {})
-                if not isinstance(corrections, dict):
-                    corrections = {}
-                notes = payload.get("notes") or message.get("notes", "")
-                action = confirmation_mgr.correct(action_id, corrections, notes)
-                if action:
-                    execution = await _execute_confirmed_action(action)
-                    await websocket.send_json({
-                        "type": "confirmation_result",
-                        "data": {
-                            "action_id": action_id,
-                            "status": "corrected",
-                            "corrected_data": action.proposed_data,
-                            "execution": execution,
-                        },
-                    })
-                    if execution.get("success") and execution.get("work_order"):
-                        await websocket.send_json({
-                            "type": "work_order",
-                            "data": execution.get("work_order"),
-                        })
-                else:
-                    await websocket.send_json({
-                        "type": "error",
-                        "data": f"Unknown action_id: {action_id}",
-                    })
+                await handle_confirmation_message(
+                    msg_type=msg_type,
+                    payload=payload,
+                    message=message,
+                    confirmation_mgr=confirmation_mgr,
+                    session_id=session_id,
+                    live_request_queue=None,
+                    websocket=websocket,
+                )
 
     except WebSocketDisconnect:
         logger.info(f"Chat client disconnected: {session_id}")
     except Exception as e:
         logger.error(f"Chat error: {session_id} — {e}\n{traceback.format_exc()}")
         try:
-            await websocket.send_json({
-                "type": "error",
-                "data": f"Chat error: {str(e)}",
-            })
+            await websocket.send_json(
+                {
+                    "type": "error",
+                    "data": f"Chat error: {e!s}",
+                }
+            )
         except Exception:
             pass
     finally:

@@ -5,7 +5,6 @@ Renders inspection report data into HTML and PDF using Jinja2 + WeasyPrint.
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -13,7 +12,7 @@ logger = logging.getLogger("maintenance-eye.services.report_renderer")
 
 # Template directory
 TEMPLATE_DIR = Path(__file__).parent.parent / "templates"
-_jinja_env: Optional[Environment] = None
+_jinja_env: Environment | None = None
 
 
 def _get_jinja_env() -> Environment:
@@ -72,10 +71,10 @@ def render_report_pdf(report_data: dict) -> bytes:
 
     try:
         from weasyprint import HTML
+
         pdf_bytes = HTML(string=html_content).write_pdf()
         logger.info(
-            f"Rendered PDF report: {report_data.get('report_id', '?')} "
-            f"({len(pdf_bytes)} bytes)"
+            f"Rendered PDF report: {report_data.get('report_id', '?')} ({len(pdf_bytes)} bytes)"
         )
         return pdf_bytes
     except ImportError:

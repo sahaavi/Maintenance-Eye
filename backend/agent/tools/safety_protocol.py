@@ -52,6 +52,7 @@ DEFAULT_SAFETY = {
 
 from agent.tools.wrapper import tool_wrapper
 
+
 @tool_wrapper
 async def get_safety_protocol(
     asset_type: str,

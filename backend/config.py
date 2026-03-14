@@ -5,12 +5,13 @@ Loads environment variables and provides app-wide settings.
 
 import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # .env is at project root; config.py lives in backend/
 _root = Path(__file__).resolve().parent.parent
-load_dotenv(_root / ".env")   # project root
-load_dotenv()                  # also try cwd (if already at root)
+load_dotenv(_root / ".env")  # project root
+load_dotenv()  # also try cwd (if already at root)
 
 
 class Settings:
@@ -22,9 +23,7 @@ class Settings:
 
     # Gemini
     GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    GEMINI_LIVE_MODEL: str = os.getenv(
-        "GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest"
-    )
+    GEMINI_LIVE_MODEL: str = os.getenv("GEMINI_LIVE_MODEL", "gemini-2.5-flash-native-audio-latest")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 
     def __init__(self):
