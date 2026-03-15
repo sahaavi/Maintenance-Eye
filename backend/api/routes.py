@@ -121,14 +121,16 @@ async def get_pending_actions(session_id: str):
 
 @router.post("/sessions/{session_id}/confirm/{action_id}")
 async def confirm_action(session_id: str, action_id: str, notes: str = ""):
-    """Technician confirms a proposed action."""
+    """Technician confirms a proposed action and executes it."""
+    from api.websocket import _execute_confirmed_action
     from services.confirmation_manager import get_confirmation_manager
 
     mgr = get_confirmation_manager(session_id)
     action = mgr.confirm(action_id, notes)
     if not action:
         raise HTTPException(status_code=404, detail="Pending action not found")
-    return {"status": "confirmed", "action": action.model_dump()}
+    execution = await _execute_confirmed_action(action)
+    return {"status": "confirmed", "action": action.model_dump(), "execution": execution}
 
 
 @router.post("/sessions/{session_id}/reject/{action_id}")
@@ -144,15 +146,19 @@ async def reject_action(session_id: str, action_id: str, notes: str = ""):
 
 
 @router.post("/sessions/{session_id}/correct/{action_id}")
-async def correct_action(session_id: str, action_id: str, corrections: dict = {}, notes: str = ""):
-    """Technician corrects a proposed action with updated values."""
+async def correct_action(
+    session_id: str, action_id: str, corrections: dict | None = None, notes: str = ""
+):
+    """Technician corrects a proposed action with updated values and executes it."""
+    from api.websocket import _execute_confirmed_action
     from services.confirmation_manager import get_confirmation_manager
 
     mgr = get_confirmation_manager(session_id)
-    action = mgr.correct(action_id, corrections, notes)
+    action = mgr.correct(action_id, corrections or {}, notes)
     if not action:
         raise HTTPException(status_code=404, detail="Pending action not found")
-    return {"status": "corrected", "action": action.model_dump()}
+    execution = await _execute_confirmed_action(action)
+    return {"status": "corrected", "action": action.model_dump(), "execution": execution}
 
 
 @router.get("/sessions/{session_id}/stats")

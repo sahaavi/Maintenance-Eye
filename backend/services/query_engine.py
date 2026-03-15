@@ -434,6 +434,16 @@ _ASR_CORRECTIONS: dict[str, str] = {
     "are c": "rc",
     "tee see": "tc",
     "t see": "tc",
+    # Station name ASR corrections (non-obvious pronunciations)
+    "lohi": "lougheed",
+    "loheed": "lougheed",
+    "lou heed": "lougheed",
+    "loud heed": "lougheed",
+    "king gorge": "king george",
+    "new west minster": "new westminster",
+    "new west minister": "new westminster",
+    "joyce colling wood": "joyce-collingwood",
+    "commercial broad way": "commercial-broadway",
 }
 # Pre-sorted by key length descending for greedy matching
 _ASR_CORRECTIONS_SORTED = sorted(_ASR_CORRECTIONS.items(), key=lambda kv: len(kv[0]), reverse=True)
@@ -693,7 +703,8 @@ class QueryEngine:
         """
         hints = self.extract_asset_hints(raw_input)
         if not hints:
-            return []
+            # No ID patterns found — try name-based fuzzy matching
+            return await self._suggest_by_name(raw_input, eam_service, limit)
 
         candidates: dict[str, Any] = {}
         for hint in hints:
@@ -740,6 +751,57 @@ class QueryEngine:
                     "department": department,
                     "confidence": round(min(score / 4.0, 0.99), 2),
                     "reason": reason,
+                }
+            )
+        return suggestions
+
+    async def _suggest_by_name(
+        self,
+        raw_input: str,
+        eam_service: Any,
+        limit: int = 3,
+    ) -> list[dict[str, Any]]:
+        """
+        Suggest assets by partial name matching when no ID patterns are found.
+        Uses query_match_score to rank all assets by token overlap.
+        """
+        from services.base_eam import BaseEAMService
+        from services.search_matcher import query_match_score
+
+        # Normalize the input through ASR corrections
+        normalized = self._apply_asr_corrections(raw_input)
+
+        try:
+            all_assets = await eam_service.search_assets()
+        except Exception:
+            return []
+
+        scored: list[tuple[float, Any]] = []
+        for asset in all_assets:
+            asset_dict = asset.model_dump() if hasattr(asset, "model_dump") else asset
+            searchable = BaseEAMService.build_asset_searchable(asset_dict)
+            score = query_match_score(normalized, searchable)
+            if score >= 0.5:
+                scored.append((score, asset))
+
+        scored.sort(key=lambda x: -x[0])
+
+        suggestions: list[dict[str, Any]] = []
+        for score, asset in scored[:limit]:
+            asset_type = getattr(asset, "type", "")
+            if hasattr(asset_type, "value"):
+                asset_type = asset_type.value
+            department = getattr(asset, "department", "")
+            if hasattr(department, "value"):
+                department = department.value
+            suggestions.append(
+                {
+                    "asset_id": asset.asset_id,
+                    "name": getattr(asset, "name", ""),
+                    "type": asset_type,
+                    "department": department,
+                    "confidence": round(min(score, 0.95), 2),
+                    "reason": f"name similarity ({round(score * 100)}% token match)",
                 }
             )
         return suggestions

@@ -608,3 +608,20 @@ Additionally, Firestore WO search could crash when nullable fields (e.g., `assig
 - Smart-search zero-result payloads (`intent`, `total=0`, `results=[]`) -> explicit "No Matching Records" card
 
 **Rule:** Any tool-result side channel used as user-facing evidence must include both positive-result and empty-result shapes for the major entities; otherwise users see silent blanks and lose trust.
+
+## 2026-03-14 - ASR-Garbled Station Names Need Explicit Corrections + Partial-Match Fallback
+
+**Context:** User asked "Is there any open work order for Lohi Town section track Section 3?" and got "no results." The actual asset is "Lougheed Town Centre Rail Section #3" (RAL-LO-003). Same failure in both chat and live inspection.
+
+**Root Cause (3 compounding issues):**
+1. Token "lohi" (4 chars) was below the 5-char minimum for fuzzy bigram matching, and even if checked, Dice coefficient "lohi"↔"lougheed" = 0.2 (threshold 0.6).
+2. "track" had no text-matching synonym for "rail" — the word appeared in `DEPARTMENT_ALIASES` (→ guideway filter) but not in `_DOMAIN_CORRECTIONS`.
+3. `suggest_asset_candidates()` returned `[]` immediately when no ID patterns (like "RC-139") were detected. Name-based queries with no recognizable asset ID never generated "Did you mean?" suggestions.
+
+**Solution (4 layers):**
+1. Added station name ASR corrections to `_ASR_CORRECTIONS` in `query_engine.py` ("lohi"→"lougheed", "king gorge"→"king george", etc.).
+2. Added `"track": "rail"` to `_DOMAIN_CORRECTIONS` in `search_matcher.py` (symmetric — both query and DB text normalize).
+3. Added `query_match_score()` to `search_matcher.py` — returns fraction of matched tokens (0.0-1.0) with relaxed thresholds (bigram min 4 chars, threshold 0.5) for suggestion ranking.
+4. Enhanced `suggest_asset_candidates()` in `query_engine.py` — when no ID hints found, scores all assets by name similarity via `query_match_score()` and returns top-3 with ≥50% token match.
+
+**Rule:** For speech-driven search over proper nouns (station names, location names), explicit ASR correction maps are more reliable than phonetic algorithms. Additionally, every search path that can return 0 results must have a name-based fuzzy suggestion fallback — not just ID-based — so the agent can ask "Did you mean X?" instead of saying "not found."

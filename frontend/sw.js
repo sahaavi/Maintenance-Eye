@@ -1,7 +1,7 @@
 // Maintenance-Eye Service Worker
 // Provides offline support and PWA functionality
 
-const CACHE_NAME = 'maintenance-eye-v12';
+const CACHE_NAME = 'maintenance-eye-v13';
 const ASSETS = [
     '/',
     '/index.html',

@@ -120,6 +120,9 @@ class FirestoreEAM(BaseEAMService):
         if not doc.exists:
             return None
         normalized_updates = self.normalize_work_order_updates(updates)
+        # Append notes instead of replacing the entire array
+        if "notes" in normalized_updates and isinstance(normalized_updates["notes"], list):
+            normalized_updates["notes"] = firestore.ArrayUnion(normalized_updates["notes"])
         await ref.update(normalized_updates)
         updated_doc = await ref.get()
         return WorkOrder(**updated_doc.to_dict())

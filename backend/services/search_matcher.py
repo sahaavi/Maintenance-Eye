@@ -124,6 +124,7 @@ _DOMAIN_CORRECTIONS: dict[str, str] = {
     "ovc": "vobc",
     "bobc": "vobc",
     "vopc": "vobc",
+    "track": "rail",
 }
 
 
@@ -246,6 +247,90 @@ def query_matches_text(query: str, searchable_text: str) -> bool:
                 break
 
     return all(matched)
+
+
+def query_match_score(query: str, searchable_text: str) -> float:
+    """
+    Return the fraction of unique query tokens that match the searchable text (0.0-1.0).
+
+    Uses the same 3-pass matching logic as query_matches_text but with relaxed
+    thresholds suitable for suggestion ranking (not primary filtering).
+    """
+    query_tokens = _tokenize(query, drop_noise=True)
+    if not query_tokens:
+        return 1.0
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique_tokens: list[str] = []
+    for t in query_tokens:
+        if t not in seen:
+            seen.add(t)
+            unique_tokens.append(t)
+
+    if not unique_tokens:
+        return 1.0
+
+    searchable_tokens = _build_searchable_tokens(searchable_text)
+
+    matched = [False] * len(unique_tokens)
+
+    # Pass 1: exact, numeric variants, prefix
+    for i, token in enumerate(unique_tokens):
+        if token.isdigit():
+            if _numeric_variants(token) & searchable_tokens:
+                matched[i] = True
+            continue
+        if token in searchable_tokens:
+            matched[i] = True
+            continue
+        if len(token) >= 3 and any(st.startswith(token) for st in searchable_tokens):
+            matched[i] = True
+
+    # Pass 2: compound-word matching
+    i = 0
+    while i < len(unique_tokens):
+        if matched[i]:
+            i += 1
+            continue
+        token = unique_tokens[i]
+        if not token.isalpha():
+            i += 1
+            continue
+
+        if i > 0 and unique_tokens[i - 1].isalpha():
+            compound = unique_tokens[i - 1] + token
+            if compound in searchable_tokens or (
+                len(compound) >= 3 and any(st.startswith(compound) for st in searchable_tokens)
+            ):
+                matched[i] = True
+                matched[i - 1] = True
+                i += 1
+                continue
+
+        if i + 1 < len(unique_tokens) and not matched[i + 1] and unique_tokens[i + 1].isalpha():
+            compound = token + unique_tokens[i + 1]
+            if compound in searchable_tokens or (
+                len(compound) >= 3 and any(st.startswith(compound) for st in searchable_tokens)
+            ):
+                matched[i] = True
+                matched[i + 1] = True
+                i += 2
+                continue
+        i += 1
+
+    # Pass 3: fuzzy bigram matching (relaxed thresholds for suggestions)
+    for i, token in enumerate(unique_tokens):
+        if matched[i] or not token.isalpha() or len(token) < 4:
+            continue
+        for st in searchable_tokens:
+            if not st.isalpha() or len(st) < 4:
+                continue
+            if _bigram_similarity(token, st) >= 0.5:
+                matched[i] = True
+                break
+
+    return sum(matched) / len(unique_tokens)
 
 
 def _bigram_similarity(a: str, b: str) -> float:

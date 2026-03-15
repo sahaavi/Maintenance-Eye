@@ -724,6 +724,38 @@ html, body {
     filter: brightness(1.1);
 }
 
+.media-card-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.media-card-detail {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+}
+
+.detail-label {
+    color: var(--text-muted, rgba(255,255,255,0.45));
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 9px;
+    letter-spacing: 0.4px;
+}
+
+.detail-value {
+    color: var(--accent-cyan, #06b6d4);
+    font-weight: 600;
+    padding: 1px 6px;
+    background: rgba(6, 182, 212, 0.1);
+    border: 1px solid rgba(6, 182, 212, 0.2);
+    border-radius: 4px;
+    font-size: 11px;
+}
+
 /* ==================== RESPONSIVE ==================== */
 
 @media (min-width: 768px) {

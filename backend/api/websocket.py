@@ -135,11 +135,24 @@ def _extract_media_cards(tool_result: object) -> list[dict]:
                 )
             # Check for KnowledgeBaseEntry-like shapes
             if "title" in current and "content" in current and "asset_types" in current:
+                details = []
+                dept = current.get("department")
+                if dept:
+                    details.append({"label": "Department", "value": str(dept)})
+                tags = current.get("tags")
+                if tags and isinstance(tags, list):
+                    details.append({"label": "Tags", "value": ", ".join(str(t) for t in tags)})
+                asset_types = current.get("asset_types")
+                if asset_types and isinstance(asset_types, list):
+                    details.append(
+                        {"label": "Asset Types", "value": ", ".join(str(t) for t in asset_types)}
+                    )
                 cards.append(
                     {
                         "title": current.get("title"),
                         "description": current.get("content")[:200] + "...",
-                        "image_url": f"https://api.dicebear.com/7.x/identicon/svg?seed={current.get('title')}",  # Placeholder for doc icon
+                        "image_url": f"https://api.dicebear.com/7.x/identicon/svg?seed={current.get('title')}",
+                        "details": details,
                     }
                 )
             # Check for WorkOrder-like shapes
@@ -147,34 +160,88 @@ def _extract_media_cards(tool_result: object) -> list[dict]:
                 status = str(current.get("status", "unknown")).replace("_", " ").title()
                 priority = current.get("priority", "")
                 description = (current.get("description", "") or "")[:180]
+                details = [
+                    {"label": "Asset ID", "value": str(current.get("asset_id", ""))},
+                    {"label": "Status", "value": status},
+                ]
+                if priority:
+                    details.append({"label": "Priority", "value": str(priority)})
+                problem_code = current.get("problem_code")
+                if problem_code:
+                    details.append({"label": "Problem Code", "value": str(problem_code)})
+                fault_code = current.get("fault_code")
+                if fault_code:
+                    details.append({"label": "Fault Code", "value": str(fault_code)})
+                action_code = current.get("action_code")
+                if action_code:
+                    details.append({"label": "Action Code", "value": str(action_code)})
+                failure_class = current.get("failure_class")
+                if failure_class:
+                    details.append({"label": "Failure Class", "value": str(failure_class)})
+                assigned_to = current.get("assigned_to")
+                if assigned_to:
+                    details.append({"label": "Assigned To", "value": str(assigned_to)})
+                created_at = current.get("created_at")
+                if created_at:
+                    details.append({"label": "Created", "value": str(created_at)})
                 cards.append(
                     {
                         "title": f"Work Order: {current.get('wo_id')}",
-                        "description": (
-                            f"Asset: {current.get('asset_id')} | Status: {status}"
-                            + (f" | Priority: {priority}" if priority else "")
-                            + (f"\n{description}" if description else "")
-                        ),
+                        "description": description if description else None,
                         "image_url": f"https://api.dicebear.com/7.x/identicon/svg?seed={current.get('wo_id')}",
+                        "details": details,
                     }
                 )
             # Check for Asset-like shapes
             elif "asset_id" in current and "name" in current and "type" in current:
+                details = [
+                    {"label": "Asset ID", "value": str(current.get("asset_id", ""))},
+                    {"label": "Type", "value": str(current.get("type", ""))},
+                    {"label": "Status", "value": str(current.get("status", ""))},
+                ]
+                dept = current.get("department")
+                if dept:
+                    details.append({"label": "Department", "value": str(dept)})
+                location = current.get("location")
+                if isinstance(location, dict):
+                    loc_parts = [location.get("station", ""), location.get("area", "")]
+                    loc_str = " — ".join(p for p in loc_parts if p)
+                    if loc_str:
+                        details.append({"label": "Location", "value": loc_str})
+                elif location:
+                    details.append({"label": "Location", "value": str(location)})
+                equip_code = current.get("equipment_code")
+                if equip_code:
+                    details.append({"label": "Equipment Code", "value": str(equip_code)})
+                manufacturer = current.get("manufacturer")
+                if manufacturer:
+                    details.append({"label": "Manufacturer", "value": str(manufacturer)})
+                model = current.get("model")
+                if model:
+                    details.append({"label": "Model", "value": str(model)})
                 cards.append(
                     {
                         "title": f"Asset: {current.get('name')}",
-                        "description": f"ID: {current.get('asset_id')} | Status: {current.get('status')}",
-                        "image_url": f"https://api.dicebear.com/7.x/shapes/svg?seed={current.get('asset_id')}",  # Placeholder
+                        "description": None,
+                        "image_url": f"https://api.dicebear.com/7.x/shapes/svg?seed={current.get('asset_id')}",
+                        "details": details,
                     }
                 )
             # Check for Report-like shapes
             elif "report_id" in current and "overall_condition" in current:
+                details = [
+                    {
+                        "label": "Condition",
+                        "value": current.get("overall_condition", "").replace("_", " ").title(),
+                    },
+                ]
                 cards.append(
                     {
                         "title": f"Inspection Report: {current.get('report_id')}",
-                        "description": f"Condition: {current.get('overall_condition').replace('_', ' ').title()}",
-                        "image_url": "https://api.dicebear.com/7.x/identicon/svg?seed=report",  # Doc icon
+                        "description": None,
+                        "image_url": "https://api.dicebear.com/7.x/identicon/svg?seed=report",
                         "action_link": f"/api/reports/{current.get('report_id')}/pdf",
+                        "details": details,
                     }
                 )
             queue.extend(current.values())
@@ -487,6 +554,17 @@ async def _run_bidi_session(
                             )
                         else:
                             logger.debug("Tool result did not contain a confirmation request")
+
+                        # Extract and send media cards from tool results
+                        media_cards = _extract_media_cards(tool_result)
+                        for card in media_cards:
+                            logger.info(f"Sending media_card to WebSocket: {card.get('title')}")
+                            await websocket.send_json(
+                                {
+                                    "type": "media_card",
+                                    "data": card,
+                                }
+                            )
 
                         tool_queue.task_done()
                     except TimeoutError:

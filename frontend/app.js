@@ -751,6 +751,26 @@ function renderMediaCard(data) {
         content.appendChild(desc);
     }
 
+    if (data.details && data.details.length) {
+        const detailsGrid = document.createElement('div');
+        detailsGrid.className = 'media-card-details';
+        data.details.forEach(item => {
+            if (!item.value) return;
+            const detail = document.createElement('div');
+            detail.className = 'media-card-detail';
+            const label = document.createElement('span');
+            label.className = 'detail-label';
+            label.textContent = item.label;
+            const value = document.createElement('span');
+            value.className = 'detail-value';
+            value.textContent = item.value;
+            detail.appendChild(label);
+            detail.appendChild(value);
+            detailsGrid.appendChild(detail);
+        });
+        content.appendChild(detailsGrid);
+    }
+
     if (data.action_link) {
         const link = document.createElement('a');
         link.className = 'media-card-link';
@@ -1366,6 +1386,26 @@ function renderChatMediaCard(data) {
         desc.className = 'media-card-desc';
         desc.textContent = data.description;
         content.appendChild(desc);
+    }
+
+    if (data.details && data.details.length) {
+        const detailsGrid = document.createElement('div');
+        detailsGrid.className = 'media-card-details';
+        data.details.forEach(item => {
+            if (!item.value) return;
+            const detail = document.createElement('div');
+            detail.className = 'media-card-detail';
+            const label = document.createElement('span');
+            label.className = 'detail-label';
+            label.textContent = item.label;
+            const value = document.createElement('span');
+            value.className = 'detail-value';
+            value.textContent = item.value;
+            detail.appendChild(label);
+            detail.appendChild(value);
+            detailsGrid.appendChild(detail);
+        });
+        content.appendChild(detailsGrid);
     }
 
     if (data.action_link) {
