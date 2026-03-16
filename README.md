@@ -13,7 +13,7 @@ Point your phone camera at equipment. Speak naturally. Your AI co-pilot sees, di
 
 > **Category**: Live Agents -- Real-time audio + vision with barge-in interruption
 >
-> **Built for the** [Google Gemini Live Agent Challenge](https://ai.google.dev/competition/gemini-api-developer)
+> **Built for the** [Google Gemini Live Agent Challenge](https://geminiliveagentchallenge.devpost.com/)
 
 [Live Demo](https://maintenance-eye-swrz6daraq-uc.a.run.app)
 
