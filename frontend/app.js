@@ -35,6 +35,10 @@ const state = {
     currentTranscriptEl: null,       // DOM element for current transcript bubble
     currentTranscriptSpeaker: null,  // 'You' or 'Max'
     transcriptFlushTimer: null,      // Timer to finalize bubble after silence
+    // Reconnect state
+    reconnectAttempts: 0,
+    reconnectTimer: null,
+    intentionalClose: false,
 };
 
 // Audio config
@@ -45,6 +49,8 @@ const VIDEO_FPS = 2;
 const VIDEO_QUALITY = 0.65;
 const VIDEO_MAX_WIDTH = 640;
 const MAX_MESSAGE_ITEMS = 120;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_DELAY = 1000; // 1s, 2s, 4s, max 8s
 
 // ==================== DOM ELEMENTS ====================
 
@@ -297,16 +303,22 @@ function connectWebSocket() {
     const wsUrl = `${protocol}//${window.location.host}/ws/inspect/${state.userId}${tokenParam}`;
 
     console.log('[WS] Connecting:', wsUrl);
+    state.intentionalClose = false;
     state.ws = new WebSocket(wsUrl);
 
     state.ws.onopen = () => {
         console.log('[WS] Connected');
         state.isConnected = true;
-        updateConnectionStatus(true);
+        state.reconnectAttempts = 0;
+        updateConnectionStatus('connected');
 
         // Start streaming
         startAudioCapture();
         startVideoStreaming();
+
+        if (state.reconnectAttempts === 0 && state.sessionStartTime) {
+            addAgentMessage('Session reconnected. Previous context may be lost.');
+        }
     };
 
     state.ws.onmessage = (event) => {
@@ -321,14 +333,31 @@ function connectWebSocket() {
     state.ws.onclose = () => {
         console.log('[WS] Disconnected');
         state.isConnected = false;
-        updateConnectionStatus(false);
         stopAudioCapture();
         stopVideoStreaming();
+
+        if (!state.intentionalClose) {
+            attemptReconnect();
+        } else {
+            updateConnectionStatus('disconnected');
+        }
     };
 
     state.ws.onerror = (err) => {
         console.error('[WS] Error:', err);
     };
+}
+
+function attemptReconnect() {
+    if (state.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        updateConnectionStatus('failed');
+        return;
+    }
+    state.reconnectAttempts++;
+    const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, state.reconnectAttempts - 1), 8000);
+    console.log(`[WS] Reconnecting in ${delay}ms (attempt ${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+    updateConnectionStatus('reconnecting');
+    state.reconnectTimer = setTimeout(() => connectWebSocket(), delay);
 }
 
 function wsSend(type, data) {
@@ -647,6 +676,8 @@ async function endInspection() {
         state.hudInterval = null;
     }
 
+    state.intentionalClose = true;
+    clearTimeout(state.reconnectTimer);
     if (state.ws) {
         state.ws.close();
         state.ws = null;
@@ -937,14 +968,35 @@ function updateHudData() {
     }
 }
 
-function updateConnectionStatus(connected) {
+function updateConnectionStatus(status) {
     const statusEl = el.connectionStatus();
-    if (connected) {
-        statusEl.classList.add('connected');
-        statusEl.querySelector('span:last-child').textContent = 'Connected to Max';
-    } else {
-        statusEl.classList.remove('connected');
-        statusEl.querySelector('span:last-child').textContent = 'Ready to connect';
+    // Support legacy boolean calls
+    if (status === true) status = 'connected';
+    if (status === false) status = 'disconnected';
+
+    statusEl.classList.remove('connected', 'reconnecting');
+    const textEl = statusEl.querySelector('span:last-child');
+
+    switch (status) {
+        case 'connected':
+            statusEl.classList.add('connected');
+            textEl.textContent = 'Connected to Max';
+            break;
+        case 'reconnecting':
+            statusEl.classList.add('reconnecting');
+            textEl.textContent = `Reconnecting... (${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
+            break;
+        case 'failed':
+            textEl.textContent = 'Connection lost. Tap to retry.';
+            statusEl.onclick = () => {
+                state.reconnectAttempts = 0;
+                connectWebSocket();
+                statusEl.onclick = null;
+            };
+            break;
+        default:
+            textEl.textContent = 'Ready to connect';
+            break;
     }
 }
 
@@ -985,6 +1037,9 @@ const chatState = {
     isVoiceMode: false,
     attachedImageB64: null,
     recognition: null,  // Web Speech API
+    reconnectAttempts: 0,
+    reconnectTimer: null,
+    intentionalClose: false,
 };
 
 function toggleChatPanel() {
@@ -1017,13 +1072,15 @@ function connectChatWebSocket() {
     const wsUrl = `${protocol}//${window.location.host}/ws/chat/${state.userId}?${params}`;
 
     console.log('[Chat WS] Connecting:', wsUrl);
+    chatState.intentionalClose = false;
     chatState.ws = new WebSocket(wsUrl);
 
     chatState.ws.onopen = () => {
         console.log('[Chat WS] Connected');
         chatState.isConnected = true;
+        chatState.reconnectAttempts = 0;
         setChatStatus('Online');
-        updateConnectionStatus(true);
+        updateConnectionStatus('connected');
     };
 
     chatState.ws.onmessage = (event) => {
@@ -1038,13 +1095,30 @@ function connectChatWebSocket() {
     chatState.ws.onclose = () => {
         console.log('[Chat WS] Disconnected');
         chatState.isConnected = false;
-        setChatStatus('Offline');
-        updateConnectionStatus(false);
+
+        if (!chatState.intentionalClose) {
+            setChatStatus('Reconnecting...');
+            attemptChatReconnect();
+        } else {
+            setChatStatus('Offline');
+            updateConnectionStatus('disconnected');
+        }
     };
 
     chatState.ws.onerror = (err) => {
         console.error('[Chat WS] Error:', err);
     };
+}
+
+function attemptChatReconnect() {
+    if (chatState.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        setChatStatus('Offline');
+        return;
+    }
+    chatState.reconnectAttempts++;
+    const delay = Math.min(RECONNECT_BASE_DELAY * Math.pow(2, chatState.reconnectAttempts - 1), 8000);
+    console.log(`[Chat WS] Reconnecting in ${delay}ms (attempt ${chatState.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+    chatState.reconnectTimer = setTimeout(() => connectChatWebSocket(), delay);
 }
 
 function chatWsSend(type, data) {
@@ -1054,13 +1128,15 @@ function chatWsSend(type, data) {
 }
 
 function disconnectChat() {
+    chatState.intentionalClose = true;
+    clearTimeout(chatState.reconnectTimer);
     if (chatState.ws) {
         chatWsSend('end_session', {});
         chatState.ws.close();
         chatState.ws = null;
     }
     chatState.isConnected = false;
-    updateConnectionStatus(false);
+    updateConnectionStatus('disconnected');
 }
 
 function handleChatServerMessage(msg) {
@@ -1611,11 +1687,13 @@ function showPageState(pageId, state) {
     if (!page) return;
     const loading = page.querySelector('.dash-loading');
     const empty = page.querySelector('.dash-empty');
+    const error = page.querySelector('.dash-error');
     const table = page.querySelector('.data-table');
     const grid = page.querySelector('.data-grid');
     const list = page.querySelector('.locations-list');
     if (loading) loading.style.display = state === 'loading' ? 'flex' : 'none';
     if (empty) empty.style.display = state === 'empty' ? 'flex' : 'none';
+    if (error) error.style.display = state === 'error' ? 'flex' : 'none';
     if (table) table.style.display = state === 'data' ? 'table' : 'none';
     if (grid && state !== 'data') grid.innerHTML = '';
     if (list) list.style.display = state === 'data' ? 'block' : 'none';
@@ -1709,7 +1787,7 @@ async function loadPageData(pageId, endpoint, getFilters, renderFn, postFilter) 
         renderFn(items);
         showPageState(pageId, 'data');
     } catch (err) {
-        showPageState(pageId, 'empty');
+        showPageState(pageId, 'error');
         console.error(`Error loading ${pageId}:`, err);
     }
 }

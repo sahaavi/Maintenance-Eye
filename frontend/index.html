@@ -16,7 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap">
-    <link rel="stylesheet" href="style.css?v=13">
+    <link rel="stylesheet" href="style.css?v=14">
 </head>
 
 <body>
@@ -44,16 +44,16 @@
                 <p class="logo-tagline">AI Co-Pilot for Infrastructure Maintenance</p>
             </div>
 
-            <button id="btn-start" class="btn-primary" onclick="startInspection()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-start" class="btn-primary" onclick="startInspection()" aria-label="Start camera inspection">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
                     <circle cx="12" cy="13" r="4" />
                 </svg>
                 Start Inspection
             </button>
 
-            <button id="btn-dashboard" class="btn-secondary" onclick="showDashboard()">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-dashboard" class="btn-secondary" onclick="showDashboard()" aria-label="Browse enterprise data explorer">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <rect x="3" y="3" width="7" height="7" rx="1" />
                     <rect x="14" y="3" width="7" height="7" rx="1" />
                     <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -77,14 +77,14 @@
                         <span class="agent-name">Max</span>
                         <span class="agent-status" id="chat-agent-status">Offline</span>
                     </div>
-                    <button class="btn-icon" onclick="closeChatPanel()" title="Close chat">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="btn-icon" onclick="closeChatPanel()" title="Close chat" aria-label="Close chat panel">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path d="M18 6L6 18M6 6l12 12"/>
                         </svg>
                     </button>
                 </div>
 
-                <div id="chat-messages" class="chat-messages">
+                <div id="chat-messages" class="chat-messages" aria-live="polite">
                     <div class="message agent-message">
                         <p>Hi! I'm Max, your maintenance co-pilot. Ask me anything about assets, work orders, safety protocols, or attach a photo for analysis.</p>
                     </div>
@@ -100,7 +100,7 @@
                     <button class="chat-source-btn" onclick="selectChatImageFromGallery()">Choose Photo</button>
                 </div>
 
-                <div id="chat-confirmation-container" class="confirmation-container"></div>
+                <div id="chat-confirmation-container" class="confirmation-container" role="alert"></div>
 
                 <div class="chat-input-bar">
                     <button id="btn-chat-attach" class="btn-icon" onclick="attachImage()" title="Attach image">
@@ -135,7 +135,7 @@
 
             <div id="splash-status" class="splash-status" style="display:none;"></div>
 
-            <div class="status-bar" id="connection-status">
+            <div class="status-bar" id="connection-status" aria-live="assertive" role="status">
                 <span class="status-dot"></span>
                 <span>Ready to connect</span>
             </div>
@@ -146,8 +146,8 @@
     <div id="dashboard-screen" class="screen">
         <!-- Top Header Bar -->
         <div id="dash-topbar">
-            <button id="btn-back" class="btn-icon" onclick="hideDashboard()" title="Go back">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-back" class="btn-icon" onclick="hideDashboard()" title="Go back" aria-label="Go back to home">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M19 12H5M12 19l-7-7 7-7" />
                 </svg>
             </button>
@@ -157,7 +157,7 @@
 
         <div id="dash-layout">
             <!-- Sidebar Nav (desktop) -->
-            <nav id="dash-sidebar">
+            <nav id="dash-sidebar" role="navigation" aria-label="Dashboard navigation">
                 <button class="nav-item active" data-page="work-orders" onclick="navigateTo('work-orders')">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
                     <span>Work Orders</span>
@@ -197,6 +197,7 @@
                     <div class="table-container">
                         <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
                         <div class="dash-empty" style="display:none;"><p>No work orders found</p></div>
+                        <div class="dash-error" style="display:none;"><p>Failed to load data.</p><button class="retry-btn" onclick="loadWorkOrders()">Tap to retry</button></div>
                         <table class="data-table" id="wo-table" style="display:none;">
                             <thead><tr><th>WO #</th><th>Priority</th><th>Description</th><th>Asset</th><th>Status</th><th>Problem Code</th><th>Created</th></tr></thead>
                             <tbody id="wo-tbody"></tbody>
@@ -217,6 +218,7 @@
                     </div>
                     <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
                     <div class="dash-empty" style="display:none;"><p>No assets found</p></div>
+                    <div class="dash-error" style="display:none;"><p>Failed to load data.</p><button class="retry-btn" onclick="loadAssets()">Tap to retry</button></div>
                     <div class="data-grid" id="asset-grid"></div>
                 </div>
 
@@ -225,6 +227,7 @@
                     <h3 class="page-title">Locations</h3>
                     <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
                     <div class="dash-empty" style="display:none;"><p>No locations found</p></div>
+                    <div class="dash-error" style="display:none;"><p>Failed to load data.</p><button class="retry-btn" onclick="loadLocations()">Tap to retry</button></div>
                     <div id="locations-list" class="locations-list"></div>
                 </div>
 
@@ -239,6 +242,7 @@
                     </div>
                     <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
                     <div class="dash-empty" style="display:none;"><p>No articles found</p></div>
+                    <div class="dash-error" style="display:none;"><p>Failed to load data.</p><button class="retry-btn" onclick="loadKnowledge()">Tap to retry</button></div>
                     <div class="data-grid" id="kb-grid"></div>
                 </div>
 
@@ -255,6 +259,7 @@
                     <div class="table-container">
                         <div class="dash-loading" style="display:none;"><div class="spinner"></div><span>Loading...</span></div>
                         <div class="dash-empty" style="display:none;"><p>No EAM codes found</p></div>
+                        <div class="dash-error" style="display:none;"><p>Failed to load data.</p><button class="retry-btn" onclick="loadEAMCodes()">Tap to retry</button></div>
                         <table class="data-table" id="eam-table" style="display:none;">
                             <thead><tr><th>Code</th><th>Type</th><th>Description</th><th>Department</th><th>Asset Types</th></tr></thead>
                             <tbody id="eam-tbody"></tbody>
@@ -265,7 +270,7 @@
         </div>
 
         <!-- Mobile Bottom Nav -->
-        <nav id="dash-bottom-nav">
+        <nav id="dash-bottom-nav" role="navigation" aria-label="Dashboard navigation">
             <button class="bnav-item active" data-page="work-orders" onclick="navigateTo('work-orders')">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
                 <span>Orders</span>
@@ -330,8 +335,8 @@
         <!-- Top Bar -->
         <div id="top-bar">
             <div class="top-bar-left">
-                <button id="btn-back-inspection" class="btn-icon" onclick="endInspection()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button id="btn-back-inspection" class="btn-icon" onclick="endInspection()" aria-label="End inspection and go back">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M19 12H5M12 19l-7-7 7-7" />
                     </svg>
                 </button>
@@ -341,7 +346,7 @@
                 </div>
             </div>
             <div class="top-bar-right">
-                <div class="recording-indicator" id="recording-indicator">
+                <div class="recording-indicator" id="recording-indicator" role="status" aria-label="Live recording indicator">
                     <span class="rec-dot"></span>
                     LIVE
                 </div>
@@ -358,14 +363,14 @@
                     <span class="agent-name">Max</span>
                     <span class="agent-status" id="agent-status">Listening...</span>
                 </div>
-                <button class="btn-icon btn-expand" id="btn-expand-panel" onclick="togglePanel()">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <button class="btn-icon btn-expand" id="btn-expand-panel" onclick="togglePanel()" aria-label="Expand or collapse agent panel">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <path d="M18 15l-6-6-6 6" />
                     </svg>
                 </button>
             </div>
 
-            <div id="agent-messages" class="agent-messages">
+            <div id="agent-messages" class="agent-messages" aria-live="polite">
                 <div class="message agent-message">
                     <p>Ready for inspection. What equipment are we looking at today?</p>
                 </div>
@@ -375,27 +380,27 @@
             <div id="findings-container" class="findings-container"></div>
 
             <!-- Confirmation Cards (Human-in-the-Loop) -->
-            <div id="confirmation-container" class="confirmation-container"></div>
+            <div id="confirmation-container" class="confirmation-container" role="alert"></div>
         </div>
 
         <!-- Bottom Controls -->
         <div id="bottom-controls">
-            <button id="btn-mic" class="btn-control btn-mic active" onclick="toggleMic()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-mic" class="btn-control btn-mic active" onclick="toggleMic()" aria-label="Toggle microphone">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
                     <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                     <line x1="12" y1="19" x2="12" y2="23" />
                     <line x1="8" y1="23" x2="16" y2="23" />
                 </svg>
             </button>
-            <button id="btn-capture" class="btn-control btn-capture" onclick="capturePhoto()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-capture" class="btn-control btn-capture" onclick="capturePhoto()" aria-label="Capture photo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <circle cx="12" cy="12" r="10" />
                     <circle cx="12" cy="12" r="4" fill="currentColor" />
                 </svg>
             </button>
-            <button id="btn-report" class="btn-control btn-report" onclick="requestReport()">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button id="btn-report" class="btn-control btn-report" onclick="requestReport()" aria-label="Generate inspection report">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <polyline points="14,2 14,8 20,8" />
                     <line x1="16" y1="13" x2="8" y2="13" />
@@ -405,7 +410,7 @@
         </div>
     </div>
 
-    <script src="app.js?v=13"></script>
+    <script src="app.js?v=14"></script>
 </body>
 
 </html>

@@ -4,7 +4,9 @@ FastAPI application entry point.
 Initializes the ADK Runner for bidi-streaming Live API sessions.
 """
 
+import json
 import logging
+import time
 
 from agent.maintenance_agent import chat_agent, maintenance_agent
 from api.routes import router as api_router
@@ -15,14 +17,44 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
+from middleware.security import SecurityHeadersMiddleware
 from services.auth_service import require_auth_http
 
-# Configure logging
+# ============================================================================
+# Logging — JSON in production, plaintext locally
+# ============================================================================
+
+
+class JSONFormatter(logging.Formatter):
+    """Structured JSON log formatter for Cloud Logging."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "severity": record.levelname,
+            "message": record.getMessage(),
+            "timestamp": self.formatTime(record, self.datefmt),
+            "logger": record.name,
+            "module": record.module,
+        }
+        if record.exc_info and record.exc_info[0] is not None:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_entry)
+
+
+_handler = logging.StreamHandler()
+if settings.APP_ENV == "production":
+    _handler.setFormatter(JSONFormatter())
+else:
+    _handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+
 logging.basicConfig(
     level=getattr(logging, settings.LOG_LEVEL),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[_handler],
 )
 logger = logging.getLogger("maintenance-eye")
+
+# Startup timestamp for uptime tracking
+_startup_time = time.monotonic()
 
 # ============================================================================
 # ADK Application Initialization (once at startup)
@@ -64,6 +96,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Security headers
+app.add_middleware(SecurityHeadersMiddleware)
+
 # CORS
 cors_origins = settings.cors_origins
 app.add_middleware(
@@ -100,19 +135,69 @@ async def startup_auto_seed():
     await auto_seed_firestore(eam)
 
 
+@app.on_event("shutdown")
+async def shutdown_notify_clients():
+    """Notify active WebSocket clients before shutdown (Cloud Run SIGTERM)."""
+    from api.websocket import active_connections
+
+    for ws in list(active_connections):
+        try:
+            await ws.send_json(
+                {
+                    "type": "status",
+                    "data": "Server is restarting. Please reconnect.",
+                }
+            )
+            await ws.close(code=1012)  # 1012 = Service Restart
+        except Exception:
+            pass
+    logger.info("Graceful shutdown: notified active WebSocket clients")
+
+
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Cloud Run."""
-    from services.firestore_eam import get_eam_service
+    """Liveness probe — returns uptime, version, active session count."""
+    from api.websocket import active_connections
 
+    uptime_seconds = round(time.monotonic() - _startup_time, 1)
     return {
         "status": "healthy",
         "service": "maintenance-eye",
         "version": "1.0.0",
         "agent": maintenance_agent.name,
         "model": settings.GEMINI_LIVE_MODEL,
-        "eam_backend": type(get_eam_service()).__name__,
+        "uptime_seconds": uptime_seconds,
+        "active_sessions": len(active_connections),
     }
+
+
+@app.get("/readiness")
+async def readiness_check():
+    """Readiness probe — validates EAM backend connectivity."""
+    from services.firestore_eam import get_eam_service
+
+    eam = get_eam_service()
+    eam_type = type(eam).__name__
+
+    try:
+        # Probe: fetch a single asset to verify connectivity
+        assets = await eam.get_assets(limit=1)
+        reachable = True
+    except Exception as e:
+        reachable = False
+        logger.warning(f"Readiness probe failed: {e}")
+
+    status_code = 200 if reachable else 503
+    from fastapi.responses import JSONResponse
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ready" if reachable else "not_ready",
+            "eam_backend": eam_type,
+            "reachable": reachable,
+        },
+    )
 
 
 # Serve frontend static files (must be AFTER all other routes)

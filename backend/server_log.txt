@@ -1,2 +1,0 @@
-/home/avisaha/Maintenance-Eye/backend/venv/lib/python3.12/site-packages/google/cloud/aiplatform/models.py:52: FutureWarning: Support for google-cloud-storage < 3.0.0 will be removed in a future version of google-cloud-aiplatform. Please upgrade to google-cloud-storage >= 3.0.0.
-  from google.cloud.aiplatform.utils import gcs_utils

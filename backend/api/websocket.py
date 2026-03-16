@@ -43,6 +43,9 @@ from services.storage_service import get_storage_service
 router = APIRouter()
 logger = logging.getLogger("maintenance-eye.websocket")
 
+# Track active WebSocket connections for graceful shutdown
+active_connections: set[WebSocket] = set()
+
 # Audio configuration
 SEND_SAMPLE_RATE = 16000  # Phone → server (PCM 16kHz mono 16-bit)
 RECEIVE_SAMPLE_RATE = 24000  # Server → phone (PCM 24kHz mono 16-bit)
@@ -719,6 +722,7 @@ async def inspection_websocket(
     if not auth_ctx:
         return
     await websocket.accept()
+    active_connections.add(websocket)
 
     if not session_id:
         session_id = f"inspect-{id(websocket)}"
@@ -732,12 +736,15 @@ async def inspection_websocket(
         output_audio_transcription=types.AudioTranscriptionConfig(),
     )
 
-    await _run_bidi_session(
-        websocket=websocket,
-        resolved_user_id=resolved_user_id,
-        session_id=session_id,
-        run_config=run_config,
-    )
+    try:
+        await _run_bidi_session(
+            websocket=websocket,
+            resolved_user_id=resolved_user_id,
+            session_id=session_id,
+            run_config=run_config,
+        )
+    finally:
+        active_connections.discard(websocket)
 
 
 @router.websocket("/ws/chat/{user_id}")
@@ -769,6 +776,7 @@ async def chat_websocket(
     if not auth_ctx:
         return
     await websocket.accept()
+    active_connections.add(websocket)
 
     from main import CHAT_APP_NAME, chat_runner, chat_session_service
 
@@ -922,6 +930,7 @@ async def chat_websocket(
         except Exception:
             pass
     finally:
+        active_connections.discard(websocket)
         side_task.cancel()
         remove_tool_result_queue(session_id)
         stats = remove_confirmation_manager(session_id)

@@ -225,4 +225,25 @@ terraform/.terraform.lock.hcl
 *.mkv
 *.wmv
 *.webm
-demo/raw_videos/
+demo/
+
+# AI tooling
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+RULES.md
+PROJECT_CONTEXT.md
+.claude/
+.gstack/
+.antigravityignore
+
+# Editor
+.vscode/
+
+# Dev artifacts
+v*.txt
+*.xlsx
+tasks/
+conversation/
+hackathon/
+BUG_REPORT.md

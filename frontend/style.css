@@ -231,6 +231,20 @@ html, body {
     box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
 }
 
+.status-bar.reconnecting .status-dot {
+    background: #f59e0b;
+    animation: reconnect-pulse 1.2s ease-in-out infinite;
+}
+
+.status-bar.reconnecting {
+    color: #f59e0b;
+}
+
+@keyframes reconnect-pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(245, 158, 11, 0.4); opacity: 1; }
+    50% { box-shadow: 0 0 12px rgba(245, 158, 11, 0.8); opacity: 0.6; }
+}
+
 /* ==================== CAMERA ==================== */
 
 #camera-container {
@@ -1588,6 +1602,34 @@ html, body {
     padding: 40px;
     color: var(--text-muted);
     font-size: 14px;
+}
+
+.dash-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 40px;
+    color: #f87171;
+    font-size: 14px;
+}
+
+.retry-btn {
+    padding: 8px 20px;
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    border-radius: var(--radius-sm);
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.retry-btn:hover {
+    background: rgba(248, 113, 113, 0.2);
+    border-color: rgba(248, 113, 113, 0.5);
 }
 
 .data-error {
