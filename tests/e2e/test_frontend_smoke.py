@@ -100,7 +100,7 @@ def test_home_to_dashboard_navigation(page: Page, static_server: str) -> None:
     page.route("**/api/**", fulfill_api)
 
     page.goto(static_server, wait_until="networkidle", timeout=SETTINGS.e2e_timeout_ms)
-    page.get_by_role("button", name="Browse Data").click()
+    page.get_by_role("button", name="Browse enterprise data explorer").click()
 
     expect_title = page.locator("#dash-topbar .dashboard-title")
     expect_title.wait_for(state="visible", timeout=SETTINGS.e2e_timeout_ms)
