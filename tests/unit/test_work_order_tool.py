@@ -3,6 +3,23 @@ from __future__ import annotations
 import pytest
 from agent.tools.work_order import manage_work_order  # type: ignore[import-not-found]
 from services.json_eam import JsonEAM  # type: ignore[import-not-found]
+from services.search_service import SearchService  # type: ignore[import-not-found]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_search_service_search_work_orders_uses_asr_aware_asset_ids() -> None:
+    service = SearchService()
+
+    result = await service.search_work_orders(
+        JsonEAM(),
+        query="open work orders for e s c dash s c dash zero zero three",
+    )
+
+    assert result["success"] is True
+    wo_ids = {wo["wo_id"] for wo in result["work_orders"]}
+    assert "WO-2026-0151" in wo_ids
+    assert "WO-2026-0152" in wo_ids
 
 
 @pytest.mark.unit

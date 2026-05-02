@@ -8,11 +8,11 @@ import logging
 
 from agent.tools.wrapper import tool_wrapper
 from services.eam_provider import get_eam_service
-from services.query_engine import QueryEngine, SearchIntent
+from services.search_service import SearchService
 
 logger = logging.getLogger("maintenance-eye.tools.smart_search")
 
-_engine = QueryEngine()
+_search_service = SearchService()
 
 
 @tool_wrapper
@@ -63,85 +63,12 @@ async def smart_search(
     eam = get_eam_service()
 
     try:
-        parsed = _engine.build_query(query)
-
-        # Override intent if user specified search_type
-        if search_type != "auto":
-            try:
-                parsed.intent = SearchIntent(search_type)
-            except ValueError:
-                pass
-
-        result = await _engine.execute_search(parsed, eam, limit=limit)
-
-        # Format results for the agent
-        formatted_results = []
-        for scored_item in result.items:
-            item = scored_item.item
-            entry = {
-                "score": round(scored_item.score, 2),
-                "type": scored_item.entity_type,
-                "match": scored_item.match_type,
-            }
-            if hasattr(item, "model_dump"):
-                entry["data"] = item.model_dump()
-            elif isinstance(item, dict):
-                entry["data"] = item
-            else:
-                entry["data"] = str(item)
-            formatted_results.append(entry)
-
-        response = {
-            "success": True,
-            "intent": parsed.intent.value,
-            "confidence": round(parsed.confidence, 2),
-            "total": result.total,
-            "has_results": result.total > 0,
-            "results": formatted_results,
-            "search_metadata": {
-                "raw_input": parsed.raw_input,
-                "normalized_terms": parsed.normalized_terms,
-                "extracted_ids": parsed.extracted_ids,
-                "filters": parsed.filters,
-                "expanded_terms": parsed.expanded_terms,
-                "search_time_ms": result.search_time_ms,
-            },
-        }
-
-        if result.total == 0 and parsed.intent in {
-            SearchIntent.work_order,
-            SearchIntent.asset,
-            SearchIntent.auto,
-        }:
-            hints = QueryEngine.extract_asset_hints(query)
-            suggestions = await _engine.suggest_asset_candidates(query, eam, limit=3)
-            if suggestions:
-                suggestion_ids = ", ".join(s["asset_id"] for s in suggestions)
-                hinted = ", ".join(hints) if hints else "that asset ID"
-                response.update(
-                    {
-                        "needs_asset_confirmation": True,
-                        "attempted_asset_hints": hints,
-                        "guessed_assets": suggestions,
-                        "message": (
-                            f"No records found for {hinted}. Did you mean {suggestion_ids}?"
-                        ),
-                    }
-                )
-            elif hints:
-                hinted = ", ".join(hints)
-                response.update(
-                    {
-                        "no_asset_match": True,
-                        "attempted_asset_hints": hints,
-                        "message": (
-                            f"No asset found matching {hinted}. "
-                            "Ask the user to confirm the exact asset tag."
-                        ),
-                    }
-                )
-
-        return response
+        return await _search_service.smart_search(
+            eam,
+            query=query,
+            search_type=search_type,
+            limit=limit,
+        )
 
     except Exception as e:
         logger.error(f"Smart search failed: {e}", exc_info=True)

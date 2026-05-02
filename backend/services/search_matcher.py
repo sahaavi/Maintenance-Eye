@@ -6,130 +6,18 @@ from __future__ import annotations
 
 import re
 
+from services.query_engine import NOISE_WORDS, NUMBER_WORD_ALIASES, QueryEngine
+
 _TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9]+")
 
-_NUMBER_WORD_ALIASES: dict[str, str] = {
-    "zero": "0",
-    "one": "1",
-    "two": "2",
-    "three": "3",
-    "four": "4",
-    "five": "5",
-    "six": "6",
-    "seven": "7",
-    "eight": "8",
-    "nine": "9",
-    "ten": "10",
-    "eleven": "11",
-    "twelve": "12",
-}
-
-_QUERY_NOISE_TOKENS = frozenset(
-    {
-        "the",
-        "a",
-        "an",
-        "for",
-        "in",
-        "at",
-        "on",
-        "about",
-        "of",
-        "to",
-        "is",
-        "are",
-        "was",
-        "were",
-        "be",
-        "been",
-        "with",
-        "and",
-        "or",
-        "not",
-        "it",
-        "show",
-        "find",
-        "get",
-        "search",
-        "look",
-        "up",
-        "lookup",
-        "me",
-        "my",
-        "all",
-        "list",
-        "display",
-        "what",
-        "where",
-        "which",
-        "how",
-        "please",
-        "can",
-        "you",
-        "i",
-        "need",
-        "want",
-        "there",
-        "any",
-        "anything",
-        "this",
-        "that",
-        "these",
-        "those",
-        "do",
-        "does",
-        "did",
-        "have",
-        "has",
-        "had",
-        "we",
-        "our",
-        "us",
-        "if",
-        "whether",
-        "currently",
-        "right",
-        "now",
-        "still",
-        "system",
-        "subsystem",
-        "work",
-        "order",
-        "orders",
-        "wo",
-        "wos",
-        "ticket",
-        "tickets",
-        "asset",
-        "assets",
-        "equipment",
-        "report",
-        "reports",
-        "record",
-        "records",
-        "inspection",
-        "inspections",
-        "dash",
-        "hyphen",
-        "minus",
-        "number",
-        "id",
-        "identifier",
-        "code",
-    }
-)
-
-
 _DOMAIN_CORRECTIONS: dict[str, str] = {
-    "ovc": "vobc",
-    "bobc": "vobc",
-    "vopc": "vobc",
     "track": "rail",
 }
 
 
 def _normalize_token(token: str) -> str:
-    t = _NUMBER_WORD_ALIASES.get(token.lower(), token.lower())
+    corrected = QueryEngine._apply_asr_corrections(token.lower())
+    t = NUMBER_WORD_ALIASES.get(corrected, corrected)
     return _DOMAIN_CORRECTIONS.get(t, t)
 
 
@@ -137,7 +25,7 @@ def _tokenize(text: str, *, drop_noise: bool = False) -> list[str]:
     tokens: list[str] = []
     for raw in _TOKEN_PATTERN.findall(text.lower()):
         token = _normalize_token(raw)
-        if drop_noise and token in _QUERY_NOISE_TOKENS:
+        if drop_noise and token in NOISE_WORDS:
             continue
         if drop_noise and len(token) <= 1 and not token.isdigit():
             continue

@@ -9,9 +9,11 @@ import logging
 from fastapi import APIRouter, HTTPException
 from models.schemas import WorkOrderStatus
 from services.eam_provider import get_eam_service
+from services.search_service import SearchService
 
 router = APIRouter()
 logger = logging.getLogger("maintenance-eye.routes")
+_search_service = SearchService()
 
 
 @router.get("/assets/{asset_id}")
@@ -33,8 +35,8 @@ async def search_assets(
 ):
     """Search assets by query, department, station, or type."""
     eam = get_eam_service()
-    return await eam.search_assets(
-        query=q, department=department, station=station, asset_type=asset_type
+    return await _search_service.search_assets(
+        eam, query=q, department=department, station=station, asset_type=asset_type
     )
 
 
@@ -58,8 +60,9 @@ async def get_work_orders(
     eam = get_eam_service()
     has_advanced = q or wo_status or priority or department or location
     if has_advanced:
-        return await eam.search_work_orders(
-            q=q,
+        return await _search_service.search_work_order_records(
+            eam,
+            query=q,
             priority=priority,
             department=department,
             status=wo_status,

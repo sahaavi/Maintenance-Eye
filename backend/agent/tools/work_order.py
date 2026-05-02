@@ -4,15 +4,18 @@ ADK tool function for creating and updating maintenance work orders.
 """
 
 import logging
+from typing import Any
 
 from agent.tools.wrapper import tool_wrapper
 from models.schemas import Priority, WorkOrder, WorkOrderStatus
 from services.eam_provider import get_eam_service
 from services.query_engine import QueryEngine
+from services.search_service import SearchService
 
 logger = logging.getLogger("maintenance-eye.tools.work_order")
 
 _engine = QueryEngine()
+_search_service = SearchService(_engine)
 
 
 def _parse_priority(priority: str) -> Priority:
@@ -108,18 +111,18 @@ async def manage_work_order(
                 assigned_to=assigned_to,
                 notes=[notes] if notes else [],
             )
-            result = await eam.create_work_order(wo)
+            created_wo = await eam.create_work_order(wo)
             return {
                 "success": True,
                 "action": "created",
-                "work_order": result.model_dump(),
-                "message": f"Work order {result.wo_id} created successfully.",
+                "work_order": created_wo.model_dump(),
+                "message": f"Work order {created_wo.wo_id} created successfully.",
             }
 
         elif action == "update":
             if not wo_id:
                 return {"success": False, "error": "wo_id required for update"}
-            updates = {}
+            updates: dict[str, Any] = {}
             if status:
                 try:
                     updates["status"] = _parse_work_order_status(status).value
@@ -140,12 +143,12 @@ async def manage_work_order(
                         "success": False,
                         "error": f"Invalid priority: {priority}. Allowed: {allowed}",
                     }
-            result = await eam.update_work_order(wo_id, updates)
-            if result:
+            updated_wo = await eam.update_work_order(wo_id, updates)
+            if updated_wo:
                 return {
                     "success": True,
                     "action": "updated",
-                    "work_order": result.model_dump(),
+                    "work_order": updated_wo.model_dump(),
                 }
             return {"success": False, "error": f"Work order {wo_id} not found"}
 
@@ -153,14 +156,14 @@ async def manage_work_order(
             if not wo_id:
                 return {"success": False, "error": "wo_id required for get"}
             # Try direct lookup first, then normalized ID candidates
-            wo = await eam.get_work_order(wo_id)
-            if not wo:
+            fetched_wo = await eam.get_work_order(wo_id)
+            if not fetched_wo:
                 for candidate in QueryEngine.normalize_wo_id(wo_id):
-                    wo = await eam.get_work_order(candidate)
-                    if wo:
+                    fetched_wo = await eam.get_work_order(candidate)
+                    if fetched_wo:
                         break
-            if wo:
-                return {"success": True, "work_order": wo.model_dump()}
+            if fetched_wo:
+                return {"success": True, "work_order": fetched_wo.model_dump()}
             return {"success": False, "error": f"Work order {wo_id} not found"}
 
         elif action == "list":
@@ -169,108 +172,22 @@ async def manage_work_order(
             except ValueError:
                 allowed = ", ".join([s.value for s in WorkOrderStatus])
                 return {"success": False, "error": f"Invalid status: {status}. Allowed: {allowed}"}
-            result = await eam.get_work_orders(asset_id=asset_id, status=wo_status)
+            work_orders = await eam.get_work_orders(asset_id=asset_id, status=wo_status)
             return {
                 "success": True,
-                "count": len(result),
-                "work_orders": [wo.model_dump() for wo in result],
+                "count": len(work_orders),
+                "work_orders": [wo.model_dump() for wo in work_orders],
             }
 
         elif action == "search":
-            # Use query engine to normalize and expand search terms
             search_text = description or notes or ""
-            parsed = _engine.build_query(search_text)
-
-            # Resolve status from explicit param or extracted filter
-            try:
-                wo_status = _parse_work_order_status(status) if status else None
-            except ValueError:
-                wo_status = None
-            if not wo_status and "status" in parsed.filters:
-                try:
-                    wo_status = _parse_work_order_status(parsed.filters["status"])
-                except ValueError:
-                    pass
-
-            # Resolve priority from explicit param or extracted filter
-            resolved_priority = priority or parsed.filters.get("priority", "")
-
-            # Resolve department from extracted filter
-            resolved_department = parsed.filters.get("department", "")
-
-            # Use normalized terms + extracted asset IDs for search
-            # Asset IDs get stripped from normalized_terms during cleaning,
-            # but they match against asset_id in the searchable text
-            search_parts = list(parsed.normalized_terms)
-            existing_upper = {part.upper() for part in search_parts}
-            for eid in parsed.extracted_ids:
-                upper = eid.upper()
-                if not upper.startswith("WO-") and upper not in existing_upper:
-                    search_parts.append(upper)
-                    existing_upper.add(upper)
-            # Also include explicit asset_id param if provided
-            if asset_id and asset_id.upper() not in existing_upper:
-                search_parts.append(asset_id.upper())
-            q_text = " ".join(search_parts)
-
-            result = await eam.search_work_orders(
-                q=q_text,
-                priority=resolved_priority,
-                department=resolved_department,
-                status=wo_status,
-                location=parsed.filters.get("location", ""),
+            return await _search_service.search_work_orders(
+                eam,
+                query=search_text,
+                asset_id=asset_id,
+                status=status,
+                priority=priority,
             )
-
-            # If few results, try with expanded terms as fallback
-            # IMPORTANT: preserve all filters from the original query
-            if len(result) < 3 and parsed.expanded_terms:
-                expanded_q = " ".join(parsed.expanded_terms)
-                expanded_result = await eam.search_work_orders(
-                    q=expanded_q,
-                    priority=resolved_priority,
-                    department=resolved_department,
-                    status=wo_status,
-                    location=parsed.filters.get("location", ""),
-                )
-                existing_ids = {wo.wo_id for wo in result}
-                for wo in expanded_result:
-                    if wo.wo_id not in existing_ids:
-                        result.append(wo)
-
-            response = {
-                "success": True,
-                "count": len(result),
-                "work_orders": [wo.model_dump() for wo in result[:20]],
-            }
-            if not result:
-                hints = QueryEngine.extract_asset_hints(search_text)
-                suggestions = await _engine.suggest_asset_candidates(search_text, eam, limit=3)
-                if suggestions:
-                    suggestion_ids = ", ".join(s["asset_id"] for s in suggestions)
-                    hinted = ", ".join(hints) if hints else "that asset ID"
-                    response.update(
-                        {
-                            "needs_asset_confirmation": True,
-                            "attempted_asset_hints": hints,
-                            "guessed_assets": suggestions,
-                            "message": (
-                                f"No work orders found for {hinted}. Did you mean {suggestion_ids}?"
-                            ),
-                        }
-                    )
-                elif hints:
-                    hinted = ", ".join(hints)
-                    response.update(
-                        {
-                            "no_asset_match": True,
-                            "attempted_asset_hints": hints,
-                            "message": (
-                                f"No asset found matching {hinted}. "
-                                "Please confirm the exact asset tag."
-                            ),
-                        }
-                    )
-            return response
 
         else:
             return {"success": False, "error": f"Unknown action: {action}"}
