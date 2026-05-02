@@ -251,6 +251,7 @@ def _extract_media_cards(tool_result: object) -> list[dict]:
             continue
     return cards
 
+
 async def _upload_session_frame(
     session_id: str,
     frame_data: bytes,
