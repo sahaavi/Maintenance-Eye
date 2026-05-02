@@ -8,7 +8,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from models.schemas import WorkOrderStatus
-from services.firestore_eam import get_eam_service
+from services.eam_provider import get_eam_service
 
 router = APIRouter()
 logger = logging.getLogger("maintenance-eye.routes")

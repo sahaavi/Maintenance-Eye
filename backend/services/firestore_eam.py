@@ -7,9 +7,7 @@ with synthetic data for the hackathon.
 import logging
 from datetime import datetime
 
-import google.auth
 from config import settings
-from google.auth.exceptions import DefaultCredentialsError
 from google.cloud import firestore
 from models.schemas import (
     Asset,
@@ -21,7 +19,6 @@ from models.schemas import (
     WorkOrderStatus,
 )
 from services.base_eam import BaseEAMService
-from services.eam_interface import EAMService
 from services.search_matcher import query_matches_text
 
 logger = logging.getLogger("maintenance-eye.firestore")
@@ -318,51 +315,3 @@ class FirestoreEAM(BaseEAMService):
         async for doc in docs:
             results.append(CorrectionLog(**doc.to_dict()))
         return results
-
-
-# Singleton instance
-_eam_service: EAMService | None = None
-
-
-def _has_firestore_runtime() -> bool:
-    """
-    Detect whether Firestore can be used in this runtime.
-    - Emulator host always enables Firestore.
-    - Otherwise require valid ADC credentials.
-    """
-    if settings.FIRESTORE_EMULATOR_HOST:
-        return True
-    try:
-        google.auth.default()
-        return True
-    except DefaultCredentialsError:
-        return False
-    except Exception as exc:
-        logger.debug(f"Failed checking ADC credentials: {exc}")
-        return False
-
-
-def get_eam_service() -> EAMService:
-    """Get or create the singleton EAM service instance.
-
-    Tries Firestore first; falls back to in-memory JSON-backed service
-    when Firestore is unavailable (no emulator, no GCP credentials).
-    """
-    global _eam_service
-    if _eam_service is not None:
-        return _eam_service
-
-    # Try Firestore when emulator or ADC credentials are available.
-    if _has_firestore_runtime():
-        try:
-            _eam_service = FirestoreEAM()
-            return _eam_service
-        except Exception as e:
-            logger.warning(f"Firestore init failed, falling back to JSON: {e}")
-
-    # Fallback to JSON-backed service
-    from services.json_eam import JsonEAM
-
-    logger.info("Using JSON-backed EAM service (seed_data.json)")
-    _eam_service = JsonEAM()
-    return _eam_service

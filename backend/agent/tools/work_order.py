@@ -5,8 +5,9 @@ ADK tool function for creating and updating maintenance work orders.
 
 import logging
 
+from agent.tools.wrapper import tool_wrapper
 from models.schemas import Priority, WorkOrder, WorkOrderStatus
-from services.firestore_eam import get_eam_service
+from services.eam_provider import get_eam_service
 from services.query_engine import QueryEngine
 
 logger = logging.getLogger("maintenance-eye.tools.work_order")
@@ -22,9 +23,6 @@ def _parse_priority(priority: str) -> Priority:
 def _parse_work_order_status(status: str) -> WorkOrderStatus:
     value = (status or "").strip().lower()
     return WorkOrderStatus(value)
-
-
-from agent.tools.wrapper import tool_wrapper
 
 
 @tool_wrapper

@@ -5,15 +5,13 @@ ADK tool function for finding assets by name, code, or location.
 
 import logging
 
-from services.firestore_eam import get_eam_service
+from agent.tools.wrapper import tool_wrapper
+from services.eam_provider import get_eam_service
 from services.query_engine import QueryEngine
 
 logger = logging.getLogger("maintenance-eye.tools.asset")
 
 _engine = QueryEngine()
-
-
-from agent.tools.wrapper import tool_wrapper
 
 
 @tool_wrapper

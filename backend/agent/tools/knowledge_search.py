@@ -5,12 +5,10 @@ ADK tool function for searching maintenance procedures and documentation.
 
 import logging
 
-from services.firestore_eam import get_eam_service
+from agent.tools.wrapper import tool_wrapper
+from services.eam_provider import get_eam_service
 
 logger = logging.getLogger("maintenance-eye.tools.knowledge")
-
-
-from agent.tools.wrapper import tool_wrapper
 
 
 @tool_wrapper

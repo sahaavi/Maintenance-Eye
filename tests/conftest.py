@@ -15,9 +15,9 @@ BACKEND_DIR = ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from api.routes import router as api_router  # type: ignore[import-not-found]
+from api.routes import router as api_router  # type: ignore[import-not-found]  # noqa: E402
 
-from tests.fixtures.factories import FakeEAM
+from tests.fixtures.factories import FakeEAM  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -56,10 +56,10 @@ def patch_eam(monkeypatch: pytest.MonkeyPatch, fake_eam: FakeEAM):
 
 @pytest.fixture
 def api_app(monkeypatch: pytest.MonkeyPatch, fake_eam: FakeEAM) -> FastAPI:
-    from services import firestore_eam  # type: ignore[import-not-found]
+    from services import eam_provider  # type: ignore[import-not-found]
 
-    monkeypatch.setattr(firestore_eam, "_eam_service", fake_eam, raising=False)
-    monkeypatch.setattr(firestore_eam, "get_eam_service", lambda: fake_eam, raising=True)
+    monkeypatch.setattr(eam_provider, "_eam_service", fake_eam, raising=False)
+    monkeypatch.setattr(eam_provider, "get_eam_service", lambda: fake_eam, raising=True)
 
     app = FastAPI(title="maintenance-eye-tests")
     app.include_router(api_router, prefix="/api")

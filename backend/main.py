@@ -7,6 +7,7 @@ Initializes the ADK Runner for bidi-streaming Live API sessions.
 import json
 import logging
 import time
+from pathlib import Path
 
 from agent.maintenance_agent import chat_agent, maintenance_agent
 from api.routes import router as api_router
@@ -110,8 +111,6 @@ app.add_middleware(
 )
 logger.info(f"CORS origins configured: {cors_origins or 'none'}")
 
-from pathlib import Path
-
 # API routes
 api_dependencies = [Depends(require_auth_http)] if settings.auth_enabled else []
 app.include_router(api_router, prefix="/api", dependencies=api_dependencies)
@@ -121,7 +120,8 @@ app.include_router(ws_router)
 @app.on_event("startup")
 async def startup_auto_seed():
     """Log active EAM backend and auto-seed Firestore if collections are empty."""
-    from services.firestore_eam import FirestoreEAM, get_eam_service
+    from services.eam_provider import get_eam_service
+    from services.firestore_eam import FirestoreEAM
     from services.seeder import auto_seed_firestore
 
     eam = get_eam_service()
@@ -174,14 +174,14 @@ async def health_check():
 @app.get("/readiness")
 async def readiness_check():
     """Readiness probe — validates EAM backend connectivity."""
-    from services.firestore_eam import get_eam_service
+    from services.eam_provider import get_eam_service
 
     eam = get_eam_service()
     eam_type = type(eam).__name__
 
     try:
-        # Probe: fetch a single asset to verify connectivity
-        assets = await eam.get_assets(limit=1)
+        # Probe through the EAMService interface to verify connectivity.
+        await eam.search_assets()
         reachable = True
     except Exception as e:
         reachable = False
