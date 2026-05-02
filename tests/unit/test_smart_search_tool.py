@@ -7,6 +7,30 @@ from services.search_matcher import (
     query_match_score,  # type: ignore[import-not-found]
     query_matches_text,  # type: ignore[import-not-found]
 )
+from services.search_service import SearchService  # type: ignore[import-not-found]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_search_service_formats_smart_search_response() -> None:
+    service = SearchService()
+    result = await service.smart_search(
+        JsonEAM(),
+        query="TC-229 ovc",
+        search_type="asset",
+    )
+
+    assert result["success"] is True
+    assert result["intent"] == "asset"
+    assert result["has_results"] is True
+    ids = result["search_metadata"]["extracted_ids"]
+    assert "TC-229-VOBC" in ids
+    asset_ids = [
+        r["data"]["asset_id"]
+        for r in result.get("results", [])
+        if r.get("data", {}).get("asset_id")
+    ]
+    assert "TC-229-VOBC" in asset_ids
 
 
 @pytest.mark.unit
