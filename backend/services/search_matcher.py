@@ -5,6 +5,7 @@ Shared text-matching helpers for asset/work-order search.
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 
 from services.query_engine import NOISE_WORDS, NUMBER_WORD_ALIASES, QueryEngine
 
@@ -15,6 +16,7 @@ _DOMAIN_CORRECTIONS: dict[str, str] = {
 }
 
 
+@lru_cache(maxsize=4096)
 def _normalize_token(token: str) -> str:
     corrected = QueryEngine._apply_asr_corrections(token.lower())
     t = NUMBER_WORD_ALIASES.get(corrected, corrected)
@@ -40,12 +42,13 @@ def _numeric_variants(token: str) -> set[str]:
     return {raw, raw.zfill(3), raw.zfill(4)}
 
 
-def _build_searchable_tokens(text: str) -> set[str]:
+@lru_cache(maxsize=2048)
+def _build_searchable_tokens(text: str) -> frozenset[str]:
     tokens = _tokenize(text, drop_noise=False)
     searchable = set(tokens)
     for token in tokens:
         searchable.update(_numeric_variants(token))
-    return searchable
+    return frozenset(searchable)
 
 
 def query_matches_text(query: str, searchable_text: str) -> bool:
