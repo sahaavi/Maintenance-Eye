@@ -6,8 +6,9 @@ ADK tool function for generating inspection reports.
 import logging
 from datetime import datetime
 
+from agent.tools.wrapper import tool_wrapper
 from models.schemas import WorkOrderStatus
-from services.firestore_eam import get_eam_service
+from services.eam_provider import get_eam_service
 from services.storage_service import get_storage_service
 
 logger = logging.getLogger("maintenance-eye.tools.report")
@@ -17,9 +18,6 @@ OPEN_WORK_ORDER_STATUSES = {WorkOrderStatus.OPEN.value, WorkOrderStatus.IN_PROGR
 
 def _status_value(status: object) -> str:
     return status.value if isinstance(status, WorkOrderStatus) else str(status)
-
-
-from agent.tools.wrapper import tool_wrapper
 
 
 @tool_wrapper

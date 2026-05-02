@@ -5,7 +5,8 @@ ADK tool function for retrieving safety procedures for equipment types.
 
 import logging
 
-from services.firestore_eam import get_eam_service
+from agent.tools.wrapper import tool_wrapper
+from services.eam_provider import get_eam_service
 
 logger = logging.getLogger("maintenance-eye.tools.safety")
 
@@ -48,9 +49,6 @@ DEFAULT_SAFETY = {
         ],
     },
 }
-
-
-from agent.tools.wrapper import tool_wrapper
 
 
 @tool_wrapper

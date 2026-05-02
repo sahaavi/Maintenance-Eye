@@ -6,15 +6,13 @@ across work orders, assets, locations, EAM codes, and knowledge base.
 
 import logging
 
-from services.firestore_eam import get_eam_service
+from agent.tools.wrapper import tool_wrapper
+from services.eam_provider import get_eam_service
 from services.query_engine import QueryEngine, SearchIntent
 
 logger = logging.getLogger("maintenance-eye.tools.smart_search")
 
 _engine = QueryEngine()
-
-
-from agent.tools.wrapper import tool_wrapper
 
 
 @tool_wrapper
