@@ -161,7 +161,7 @@ class FakeEAM:
         return result
 
     async def get_locations(self):
-        out = {}
+        out: dict[str, Any] = {}
         for asset in self.assets:
             station = asset.location.station
             out.setdefault(
