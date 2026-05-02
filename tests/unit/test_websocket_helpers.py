@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import pytest
 from api.websocket import (  # type: ignore[import-not-found]
-    _decode_additional_data,
-    _execute_confirmed_action,
     _extract_confirmation_request,
     _extract_media_cards,
 )
 from services.confirmation_manager import (  # type: ignore[import-not-found]
     ActionType,
+    ConfirmationManager,
     PendingAction,
+)
+from services.confirmation_workflow import (  # type: ignore[import-not-found]
+    ConfirmationWorkflow,
+    decode_additional_data,
 )
 
 
@@ -29,9 +32,19 @@ def test_extract_confirmation_request_finds_nested_payload() -> None:
 
 
 def test_decode_additional_data_parses_json_or_returns_empty() -> None:
-    parsed = _decode_additional_data('{"priority": "P2"}')
+    parsed = decode_additional_data('{"priority": "P2"}')
     assert parsed == {"priority": "P2"}
-    assert _decode_additional_data("not-json") == {}
+    assert decode_additional_data("not-json") == {}
+
+
+def test_websocket_helpers_use_confirmation_workflow_interface() -> None:
+    import inspect
+
+    import api.websocket_helpers as helpers  # type: ignore[import-not-found]
+
+    source = inspect.getsource(helpers)
+    assert "from api.websocket import" not in source
+    assert "ConfirmationWorkflow" in source
 
 
 def test_extract_media_cards_supports_asset_and_kb_shapes() -> None:
@@ -78,6 +91,7 @@ def test_extract_media_cards_supports_work_order_and_zero_result_summary() -> No
 
 @pytest.mark.asyncio
 async def test_execute_confirmed_create_requires_asset_id() -> None:
+    workflow = ConfirmationWorkflow(ConfirmationManager("ws-test-session-asset"))
     action = PendingAction(
         action_type=ActionType.CREATE_WORK_ORDER,
         session_id="ws-test-session-asset",
@@ -87,13 +101,14 @@ async def test_execute_confirmed_create_requires_asset_id() -> None:
         ai_confidence=0.8,
     )
 
-    result = await _execute_confirmed_action(action)
+    result = await workflow.execute(action)
     assert result["success"] is False
     assert result.get("missing_fields") == ["asset_id"]
 
 
 @pytest.mark.asyncio
 async def test_execute_confirmed_create_requires_description() -> None:
+    workflow = ConfirmationWorkflow(ConfirmationManager("ws-test-session-description"))
     action = PendingAction(
         action_type=ActionType.CREATE_WORK_ORDER,
         session_id="ws-test-session-description",
@@ -103,6 +118,6 @@ async def test_execute_confirmed_create_requires_description() -> None:
         ai_confidence=0.8,
     )
 
-    result = await _execute_confirmed_action(action)
+    result = await workflow.execute(action)
     assert result["success"] is False
     assert result.get("missing_fields") == ["description"]
