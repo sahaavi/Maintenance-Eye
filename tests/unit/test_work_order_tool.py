@@ -7,7 +7,7 @@ from services.json_eam import JsonEAM  # type: ignore[import-not-found]
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_manage_work_order_create_success(patch_eam) -> None:
+async def test_manage_work_order_create_requires_confirmation(patch_eam) -> None:
     from agent.tools import work_order  # type: ignore[import-not-found]
 
     patch_eam(work_order)
@@ -24,9 +24,30 @@ async def test_manage_work_order_create_success(patch_eam) -> None:
         notes="requires expedited review",
     )
 
-    assert result["success"] is True
-    assert result["action"] == "created"
-    assert result["work_order"]["priority"] == "P2"
+    assert result["success"] is False
+    assert result["error"] == "Technician confirmation required before create work order."
+    assert result["requires_confirmation"] is True
+    assert result["action_type"] == "create_work_order"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_manage_work_order_update_requires_confirmation(patch_eam) -> None:
+    from agent.tools import work_order  # type: ignore[import-not-found]
+
+    patch_eam(work_order)
+
+    result = await manage_work_order(
+        action="update",
+        wo_id="WO-2026-0001",
+        status="in_progress",
+        notes="technician started work",
+    )
+
+    assert result["success"] is False
+    assert result["error"] == "Technician confirmation required before update work order."
+    assert result["requires_confirmation"] is True
+    assert result["action_type"] == "update_work_order"
 
 
 @pytest.mark.unit

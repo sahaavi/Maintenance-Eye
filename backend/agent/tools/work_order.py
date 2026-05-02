@@ -5,13 +5,28 @@ ADK tool function for creating and updating maintenance work orders.
 
 import logging
 
+from agent.tools.wrapper import tool_wrapper
 from models.schemas import Priority, WorkOrder, WorkOrderStatus
 from services.firestore_eam import get_eam_service
+from services.mutation_safety import (
+    CREATE_WORK_ORDER,
+    UPDATE_WORK_ORDER,
+    confirmation_required_response,
+    missing_required_fields,
+    work_order_mutation_allowed,
+    work_order_mutation_requires_confirmation,
+)
 from services.query_engine import QueryEngine
 
 logger = logging.getLogger("maintenance-eye.tools.work_order")
 
 _engine = QueryEngine()
+
+
+def _confirmation_required(action: str) -> bool:
+    return work_order_mutation_requires_confirmation(action) and not work_order_mutation_allowed(
+        action
+    )
 
 
 def _parse_priority(priority: str) -> Priority:
@@ -22,9 +37,6 @@ def _parse_priority(priority: str) -> Priority:
 def _parse_work_order_status(status: str) -> WorkOrderStatus:
     value = (status or "").strip().lower()
     return WorkOrderStatus(value)
-
-
-from agent.tools.wrapper import tool_wrapper
 
 
 @tool_wrapper
@@ -43,8 +55,9 @@ async def manage_work_order(
     status: str = "",
 ) -> dict:
     """
-    Create or update a maintenance work order. ALWAYS ask the technician
-    for confirmation before creating a work order.
+    Create, update, retrieve, list, or search maintenance work orders.
+    Mutating actions are guarded by backend confirmation policy; unconfirmed
+    create/update attempts return a confirmation-required response.
 
     Args:
         action: One of "create", "update", "get", "list", "search".
@@ -74,11 +87,13 @@ async def manage_work_order(
 
     try:
         if action == "create":
-            missing_fields: list[str] = []
-            if not (asset_id or "").strip():
-                missing_fields.append("asset_id")
-            if not (description or "").strip():
-                missing_fields.append("description")
+            missing_fields = missing_required_fields(
+                CREATE_WORK_ORDER,
+                {
+                    "asset_id": asset_id,
+                    "description": description,
+                },
+            )
             if missing_fields:
                 return {
                     "success": False,
@@ -97,6 +112,9 @@ async def manage_work_order(
                     "success": False,
                     "error": f"Invalid priority: {priority}. Allowed: {allowed}",
                 }
+
+            if _confirmation_required(action):
+                return confirmation_required_response(action)
 
             wo = WorkOrder(
                 wo_id="",  # Will be auto-generated
@@ -119,7 +137,7 @@ async def manage_work_order(
             }
 
         elif action == "update":
-            if not wo_id:
+            if missing_required_fields(UPDATE_WORK_ORDER, {"wo_id": wo_id}):
                 return {"success": False, "error": "wo_id required for update"}
             updates = {}
             if status:
@@ -142,6 +160,9 @@ async def manage_work_order(
                         "success": False,
                         "error": f"Invalid priority: {priority}. Allowed: {allowed}",
                     }
+            if _confirmation_required(action):
+                return confirmation_required_response(action)
+
             result = await eam.update_work_order(wo_id, updates)
             if result:
                 return {

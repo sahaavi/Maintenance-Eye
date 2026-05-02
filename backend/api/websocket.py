@@ -38,6 +38,7 @@ from services.confirmation_manager import (
     get_confirmation_manager,
     remove_confirmation_manager,
 )
+from services.mutation_safety import confirmed_mutation, missing_required_fields
 from services.storage_service import get_storage_service
 
 router = APIRouter()
@@ -293,11 +294,13 @@ async def _execute_confirmed_action(action: PendingAction) -> dict:
     if action_type == ActionType.CREATE_WORK_ORDER:
         effective_asset_id = payload.get("asset_id", action.asset_id)
         effective_description = payload.get("description", action.description)
-        missing_fields = []
-        if not (effective_asset_id or "").strip():
-            missing_fields.append("asset_id")
-        if not (effective_description or "").strip():
-            missing_fields.append("description")
+        missing_fields = missing_required_fields(
+            action_type.value,
+            {
+                "asset_id": effective_asset_id,
+                "description": effective_description,
+            },
+        )
         if missing_fields:
             return {
                 "success": False,
@@ -308,47 +311,52 @@ async def _execute_confirmed_action(action: PendingAction) -> dict:
                 "missing_fields": missing_fields,
             }
 
-        return await manage_work_order(
-            action="create",
-            asset_id=effective_asset_id,
-            description=effective_description,
-            problem_code=payload.get("problem_code", ""),
-            fault_code=payload.get("fault_code", ""),
-            action_code=payload.get("action_code", ""),
-            failure_class=payload.get("failure_class", "UNSPECIFIED"),
-            priority=payload.get("priority", "P3"),
-            assigned_to=payload.get("assigned_to", ""),
-            notes=payload.get("notes", action.technician_notes or ""),
-        )
+        with confirmed_mutation(action_type.value):
+            return await manage_work_order(
+                action="create",
+                asset_id=effective_asset_id,
+                description=effective_description,
+                problem_code=payload.get("problem_code", ""),
+                fault_code=payload.get("fault_code", ""),
+                action_code=payload.get("action_code", ""),
+                failure_class=payload.get("failure_class", "UNSPECIFIED"),
+                priority=payload.get("priority", "P3"),
+                assigned_to=payload.get("assigned_to", ""),
+                notes=payload.get("notes", action.technician_notes or ""),
+            )
 
     if action_type == ActionType.UPDATE_WORK_ORDER:
-        return await manage_work_order(
-            action="update",
-            wo_id=payload.get("wo_id", ""),
-            status=payload.get("status", ""),
-            priority=payload.get("priority", ""),
-            notes=payload.get("notes", action.technician_notes or ""),
-        )
+        with confirmed_mutation(action_type.value):
+            return await manage_work_order(
+                action="update",
+                wo_id=payload.get("wo_id", ""),
+                status=payload.get("status", ""),
+                priority=payload.get("priority", ""),
+                notes=payload.get("notes", action.technician_notes or ""),
+            )
 
     if action_type == ActionType.CLOSE_WORK_ORDER:
-        return await manage_work_order(
-            action="update",
-            wo_id=payload.get("wo_id", ""),
-            status="completed",
-            notes=payload.get(
-                "notes", action.technician_notes or "Closed by technician confirmation"
-            ),
-        )
+        with confirmed_mutation(action_type.value):
+            return await manage_work_order(
+                action="update",
+                wo_id=payload.get("wo_id", ""),
+                status="completed",
+                notes=payload.get(
+                    "notes", action.technician_notes or "Closed by technician confirmation"
+                ),
+            )
 
     if action_type == ActionType.ESCALATE_PRIORITY:
-        return await manage_work_order(
-            action="update",
-            wo_id=payload.get("wo_id", ""),
-            priority=payload.get("priority", ""),
-            notes=payload.get(
-                "notes", action.technician_notes or "Priority escalated by technician confirmation"
-            ),
-        )
+        with confirmed_mutation(action_type.value):
+            return await manage_work_order(
+                action="update",
+                wo_id=payload.get("wo_id", ""),
+                priority=payload.get("priority", ""),
+                notes=payload.get(
+                    "notes",
+                    action.technician_notes or "Priority escalated by technician confirmation",
+                ),
+            )
 
     return {
         "success": False,
