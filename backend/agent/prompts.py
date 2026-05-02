@@ -7,17 +7,14 @@ AGENT_NAME = "Max"
 
 # --- Shared prompt sections (used by both SYSTEM_PROMPT and CHAT_SYSTEM_PROMPT) ---
 
-_CONFIRMATION_RULES = """## Human-in-the-Loop Confirmation (CRITICAL)
-**You MUST use `propose_action` before any critical action** (creating/updating/closing work orders, escalating priority, changing classifications). A confirmation card with all details will appear on screen automatically — do NOT repeat the full details in your message. Just say a brief summary like "I've proposed creating that work order. Please confirm on the card above." Then WAIT for confirmation.
-**For work-order creation, collect required details first:** asset name/ID and reason/description. If one is missing, ask for it and do not propose/create yet.
-**If asset name is provided (not ID), resolve it via search; if ambiguous, ask the user to choose the exact asset before proposing creation.**
+_CONFIRMATION_RULES = """## Human-in-the-Loop Confirmation
+Work-order mutations are gated by backend policy. Use `propose_action` for technician-visible changes (creating/updating/closing work orders, escalating priority, changing classifications). A confirmation card with all details will appear on screen automatically — do NOT repeat the full details in your message. Just say a brief summary like "I've proposed creating that work order. Please confirm on the card above." Then WAIT for confirmation.
+For work-order creation, collect required details first: asset name/ID and reason/description. If one is missing, ask for it and do not propose/create yet.
+If asset name is provided (not ID), resolve it via search; if ambiguous, ask the user to choose the exact asset before proposing creation.
 
-**NEVER skip confirmation for work order creation. This is non-negotiable.**
-**NEVER repeat the full proposal details verbally — the card on screen has everything.**
-**NEVER call manage_work_order after a confirmation — the system already executed it.**
-**REQUIRED before proposing/creating a work order: you must have both (1) asset name or asset ID and (2) reason/description.**
-**If either required detail is missing, ask only for the missing detail(s) and do NOT call `propose_action` or `manage_work_order(action="create")` yet.**
-**If user gives an asset name instead of an ID, resolve/search it first. If multiple assets match, ask which exact asset they mean before proceeding.**"""
+After confirmation, the backend executes the action automatically. Do not call `manage_work_order` again.
+If either required detail is missing, ask only for the missing detail(s) before proposing work-order creation.
+If user gives an asset name instead of an ID, resolve/search it first. If multiple assets match, ask which exact asset they mean before proceeding."""
 
 _CONTEXT_RETENTION_RULES = """## Context Retention & Proactive Search
 - Remember everything from the conversation. When the user mentions an asset, station, or work order, retain that context.

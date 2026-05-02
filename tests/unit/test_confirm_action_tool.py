@@ -37,3 +37,20 @@ async def test_propose_action_create_requires_description() -> None:
 
     assert result["success"] is False
     assert result.get("missing_fields") == ["description"]
+
+
+@pytest.mark.asyncio
+async def test_propose_action_create_returns_executable_confirmation_policy() -> None:
+    set_session_context("unit-confirm-session-policy")
+
+    result = propose_action(
+        action_type="create_work_order",
+        description="Create work order for bearing vibration",
+        asset_id="AST-UNIT-001",
+        priority="P2",
+        confidence=0.9,
+    )
+
+    assert result["success"] is True
+    assert result["requires_confirmation"] is True
+    assert result["action_type"] == "create_work_order"

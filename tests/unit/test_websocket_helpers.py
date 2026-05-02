@@ -121,3 +121,47 @@ async def test_execute_confirmed_create_requires_description() -> None:
     result = await workflow.execute(action)
     assert result["success"] is False
     assert result.get("missing_fields") == ["description"]
+
+
+@pytest.mark.asyncio
+async def test_execute_confirmed_create_uses_confirmed_mutation_context(patch_eam) -> None:
+    from agent.tools import work_order  # type: ignore[import-not-found]
+
+    patch_eam(work_order)
+    workflow = ConfirmationWorkflow(ConfirmationManager("ws-test-session-confirmed-create"))
+    action = PendingAction(
+        action_type=ActionType.CREATE_WORK_ORDER,
+        session_id="ws-test-session-confirmed-create",
+        asset_id="AST-UNIT-001",
+        description="Create work order for bearing vibration",
+        proposed_data={"priority": "P2"},
+        ai_confidence=0.9,
+    )
+
+    result = await workflow.execute(action)
+
+    assert result["success"] is True
+    assert result["action"] == "created"
+    assert result["work_order"]["priority"] == "P2"
+
+
+@pytest.mark.asyncio
+async def test_execute_confirmed_update_uses_confirmed_mutation_context(patch_eam) -> None:
+    from agent.tools import work_order  # type: ignore[import-not-found]
+
+    patch_eam(work_order)
+    workflow = ConfirmationWorkflow(ConfirmationManager("ws-test-session-confirmed-update"))
+    action = PendingAction(
+        action_type=ActionType.UPDATE_WORK_ORDER,
+        session_id="ws-test-session-confirmed-update",
+        asset_id="AST-UNIT-001",
+        description="Update work order status",
+        proposed_data={"wo_id": "WO-2026-0001", "status": "in_progress"},
+        ai_confidence=0.9,
+    )
+
+    result = await workflow.execute(action)
+
+    assert result["success"] is True
+    assert result["action"] == "updated"
+    assert result["work_order"]["status"] == "in_progress"

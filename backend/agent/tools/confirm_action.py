@@ -11,14 +11,14 @@ The agent uses this tool to:
 import logging
 from contextvars import ContextVar
 
+from agent.tools.wrapper import tool_wrapper
 from services.confirmation_manager import (
     ActionType,
     get_confirmation_manager,
 )
+from services.mutation_safety import missing_required_fields
 
 logger = logging.getLogger("maintenance-eye.tools.confirm")
-
-from agent.tools.wrapper import tool_wrapper
 
 # Session context scoped per async task to avoid cross-session leakage.
 _session_id_ctx: ContextVar[str] = ContextVar("maintenance_eye_session_id", default="default")
@@ -80,25 +80,26 @@ def propose_action(
             f"Must be one of: {[e.value for e in ActionType]}",
         }
 
-    if at == ActionType.CREATE_WORK_ORDER:
-        missing_fields: list[str] = []
-        if not (asset_id or "").strip():
-            missing_fields.append("asset_id")
-        if not (description or "").strip():
-            missing_fields.append("description")
-        if missing_fields:
-            return {
-                "success": False,
-                "error": (
-                    "Cannot propose create_work_order without required fields: "
-                    + ", ".join(missing_fields)
-                ),
-                "missing_fields": missing_fields,
-                "instructions": (
-                    "Ask the technician for the missing required details before "
-                    "proposing work-order creation."
-                ),
-            }
+    missing_fields = missing_required_fields(
+        at.value,
+        {
+            "asset_id": asset_id,
+            "description": description,
+        },
+    )
+    if missing_fields and at == ActionType.CREATE_WORK_ORDER:
+        return {
+            "success": False,
+            "error": (
+                "Cannot propose create_work_order without required fields: "
+                + ", ".join(missing_fields)
+            ),
+            "missing_fields": missing_fields,
+            "instructions": (
+                "Ask the technician for the missing required details before "
+                "proposing work-order creation."
+            ),
+        }
 
     mgr = get_confirmation_manager(_get_session_context())
 
@@ -141,6 +142,8 @@ def propose_action(
         "success": True,
         "action_id": action.action_id,
         "status": "pending",
+        "requires_confirmation": True,
+        "action_type": action_type,
         "confirmation_prompt": {
             "action_type": action_type,
             "description": description,

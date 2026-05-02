@@ -9,13 +9,33 @@ from agent.tools.confirm_action import (  # type: ignore[import-not-found]
     propose_action,
     set_session_context,
 )
+from services.mutation_safety import (  # type: ignore[import-not-found]
+    confirmation_action_type_for_work_order_action,
+    missing_required_fields,
+    work_order_mutation_requires_confirmation,
+)
 
 
 @pytest.mark.ai
-def test_prompt_contains_confirmation_gate_requirements() -> None:
-    assert "MUST use the `propose_action` tool" in SYSTEM_PROMPT
-    assert "WAIT" in SYSTEM_PROMPT
-    assert "NEVER skip confirmation" in SYSTEM_PROMPT
+def test_executable_policy_gates_work_order_mutations() -> None:
+    assert work_order_mutation_requires_confirmation("create") is True
+    assert work_order_mutation_requires_confirmation("update") is True
+    assert work_order_mutation_requires_confirmation("search") is False
+    assert confirmation_action_type_for_work_order_action("create") == "create_work_order"
+    assert confirmation_action_type_for_work_order_action("update") == "update_work_order"
+
+
+@pytest.mark.ai
+def test_executable_policy_validates_create_work_order_fields() -> None:
+    missing = missing_required_fields(
+        "create_work_order",
+        {
+            "asset_id": "",
+            "description": "Create work order for bearing vibration",
+        },
+    )
+
+    assert missing == ["asset_id"]
 
 
 @pytest.mark.ai
@@ -33,7 +53,8 @@ def test_prompt_bias_coverage_for_all_departments() -> None:
 
 
 @pytest.mark.ai
-def test_inference_consistency_for_repeated_same_action() -> None:
+@pytest.mark.asyncio
+async def test_inference_consistency_for_repeated_same_action() -> None:
     set_session_context("ai-session-consistency")
     first = propose_action(
         action_type="create_work_order",
@@ -69,7 +90,8 @@ def test_prompt_robustness_includes_short_field_response_constraints() -> None:
 
 
 @pytest.mark.ai
-def test_failure_mode_invalid_action_type_returns_controlled_error() -> None:
+@pytest.mark.asyncio
+async def test_failure_mode_invalid_action_type_returns_controlled_error() -> None:
     set_session_context("ai-session-failure")
     result = propose_action(
         action_type="drop_database",
@@ -80,7 +102,8 @@ def test_failure_mode_invalid_action_type_returns_controlled_error() -> None:
 
 
 @pytest.mark.ai
-def test_pending_action_monitoring_surface() -> None:
+@pytest.mark.asyncio
+async def test_pending_action_monitoring_surface() -> None:
     set_session_context("ai-session-monitor")
     propose_action(
         action_type="create_work_order",
