@@ -31,6 +31,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from google.adk.agents.live_request_queue import LiveRequestQueue
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
+from models import websocket_messages as ws_messages
 from services.auth_service import require_auth_websocket
 from services.confirmation_manager import (
     ActionType,
@@ -426,11 +427,10 @@ async def _run_bidi_session(
     live_request_queue = LiveRequestQueue()
 
     await websocket.send_json(
-        {
-            "type": "status",
-            "data": "Connected to Maintenance-Eye. Live API ready.",
-            "session_id": session_id,
-        }
+        ws_messages.status_message(
+            "Connected to Maintenance-Eye. Live API ready.",
+            session_id=session_id,
+        )
     )
 
     async def upstream_task() -> None:
@@ -519,12 +519,7 @@ async def _run_bidi_session(
         except Exception as e:
             logger.error(f"Upstream error: {session_id} — {e}\n{traceback.format_exc()}")
             try:
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "data": f"Upstream error: {e!s}",
-                    }
-                )
+                await websocket.send_json(ws_messages.error_message(f"Upstream error: {e!s}"))
             except Exception:
                 pass
 
@@ -550,10 +545,7 @@ async def _run_bidi_session(
                                 f"Sending confirmation_request to WebSocket: {confirmation_payload.get('action_id')}"
                             )
                             await websocket.send_json(
-                                {
-                                    "type": "confirmation_request",
-                                    "data": confirmation_payload,
-                                }
+                                ws_messages.confirmation_request_message(confirmation_payload)
                             )
                         else:
                             logger.debug("Tool result did not contain a confirmation request")
@@ -562,12 +554,7 @@ async def _run_bidi_session(
                         media_cards = _extract_media_cards(tool_result)
                         for card in media_cards:
                             logger.info(f"Sending media_card to WebSocket: {card.get('title')}")
-                            await websocket.send_json(
-                                {
-                                    "type": "media_card",
-                                    "data": card,
-                                }
-                            )
+                            await websocket.send_json(ws_messages.media_card_message(card))
 
                         tool_queue.task_done()
                     except TimeoutError:
@@ -594,12 +581,11 @@ async def _run_bidi_session(
                         if part.inline_data and part.inline_data.data:
                             audio_b64 = base64.b64encode(part.inline_data.data).decode("utf-8")
                             await websocket.send_json(
-                                {
-                                    "type": "audio",
-                                    "data": audio_b64,
-                                    "mime_type": part.inline_data.mime_type
+                                ws_messages.audio_message(
+                                    audio_b64,
+                                    mime_type=part.inline_data.mime_type
                                     or f"audio/pcm;rate={RECEIVE_SAMPLE_RATE}",
-                                }
+                                )
                             )
 
                         # Text: transcription fragments or model reasoning
@@ -618,45 +604,30 @@ async def _run_bidi_session(
                                     "**"
                                 ):
                                     continue
-                                await websocket.send_json(
-                                    {
-                                        "type": msg_type,
-                                        "data": text,
-                                    }
+                                message_builder = (
+                                    ws_messages.transcript_input_message
+                                    if msg_type == "transcript_input"
+                                    else ws_messages.transcript_output_message
                                 )
+                                await websocket.send_json(message_builder(text))
                             # Non-partial text in live audio mode = model internal
                             # reasoning/thinking (not speech). Suppress it — the
                             # agent communicates via audio, not text bubbles.
 
                 # --- Turn complete ---
                 if getattr(event, "turn_complete", False):
-                    await websocket.send_json(
-                        {
-                            "type": "turn_complete",
-                            "data": "",
-                        }
-                    )
+                    await websocket.send_json(ws_messages.turn_complete_message())
 
                 # --- Interruption (barge-in) ---
                 if getattr(event, "interrupted", False):
-                    await websocket.send_json(
-                        {
-                            "type": "interrupted",
-                            "data": "Agent interrupted by user input",
-                        }
-                    )
+                    await websocket.send_json(ws_messages.interrupted_message())
 
         except WebSocketDisconnect:
             logger.info(f"Client disconnected (downstream): {session_id}")
         except Exception as e:
             logger.error(f"Downstream error: {session_id} — {e}\n{traceback.format_exc()}")
             try:
-                await websocket.send_json(
-                    {
-                        "type": "error",
-                        "data": f"Live API error: {e!s}",
-                    }
-                )
+                await websocket.send_json(ws_messages.error_message(f"Live API error: {e!s}"))
             except Exception:
                 pass
         finally:
@@ -692,14 +663,11 @@ async def _run_bidi_session(
 
         try:
             await websocket.send_json(
-                {
-                    "type": "session_summary",
-                    "data": {
-                        "session_id": session_id,
-                        "findings_count": len(session.findings),
-                        "confirmation_stats": stats or {},
-                    },
-                }
+                ws_messages.session_summary_message(
+                    session_id=session_id,
+                    findings_count=len(session.findings),
+                    confirmation_stats=stats or {},
+                )
             )
         except Exception:
             pass  # Client may already be disconnected
@@ -803,11 +771,10 @@ async def chat_websocket(
         )
 
     await websocket.send_json(
-        {
-            "type": "status",
-            "data": "Connected to Max (text chat). Ask me anything!",
-            "session_id": session_id,
-        }
+        ws_messages.status_message(
+            "Connected to Max (text chat). Ask me anything!",
+            session_id=session_id,
+        )
     )
 
     # Side-channel task for tool results in chat
@@ -818,10 +785,7 @@ async def chat_websocket(
                 confirmation_payload = _extract_confirmation_request(tool_result)
                 if confirmation_payload:
                     await websocket.send_json(
-                        {
-                            "type": "confirmation_request",
-                            "data": confirmation_payload,
-                        }
+                        ws_messages.confirmation_request_message(confirmation_payload)
                     )
                 tool_queue.task_done()
         except Exception as e:
@@ -856,10 +820,7 @@ async def chat_websocket(
                     )
                 )
                 await websocket.send_json(
-                    {
-                        "type": "status",
-                        "data": "Image received. Send a message to ask about it.",
-                    }
+                    ws_messages.status_message("Image received. Send a message to ask about it.")
                 )
 
             elif msg_type == "text":
@@ -871,12 +832,7 @@ async def chat_websocket(
 
                 content = types.Content(role="user", parts=parts)
 
-                await websocket.send_json(
-                    {
-                        "type": "status",
-                        "data": "Thinking...",
-                    }
-                )
+                await websocket.send_json(ws_messages.status_message("Thinking..."))
 
                 # Run the agent (async, not live streaming)
                 async for event in chat_runner.run_async(
@@ -888,19 +844,9 @@ async def chat_websocket(
                     if event.content and event.content.parts:
                         for part in event.content.parts:
                             if part.text:
-                                await websocket.send_json(
-                                    {
-                                        "type": "text",
-                                        "data": part.text,
-                                    }
-                                )
+                                await websocket.send_json(ws_messages.text_message(part.text))
 
-                await websocket.send_json(
-                    {
-                        "type": "status",
-                        "data": "Online",
-                    }
-                )
+                await websocket.send_json(ws_messages.status_message("Online"))
 
             # --- Human-in-the-Loop: confirmation responses ---
             elif msg_type in ("confirm", "reject", "correct"):
@@ -921,12 +867,7 @@ async def chat_websocket(
     except Exception as e:
         logger.error(f"Chat error: {session_id} — {e}\n{traceback.format_exc()}")
         try:
-            await websocket.send_json(
-                {
-                    "type": "error",
-                    "data": f"Chat error: {e!s}",
-                }
-            )
+            await websocket.send_json(ws_messages.error_message(f"Chat error: {e!s}"))
         except Exception:
             pass
     finally:

@@ -4,6 +4,7 @@ from typing import Any
 from api.websocket import _execute_confirmed_action, _upload_work_order_artifact
 from fastapi import WebSocket
 from google.genai import types
+from models import websocket_messages as ws_messages
 from services.confirmation_manager import ConfirmationManager
 
 logger = logging.getLogger("maintenance-eye.websocket.helpers")
@@ -44,14 +45,11 @@ async def handle_confirmation_message(
                 live_request_queue.send_content(content)
 
             await websocket.send_json(
-                {
-                    "type": "confirmation_result",
-                    "data": {
-                        "action_id": action_id,
-                        "status": "confirmed",
-                        "execution": execution,
-                    },
-                }
+                ws_messages.confirmation_result_message(
+                    action_id=action_id,
+                    status="confirmed",
+                    execution=execution,
+                )
             )
             if execution.get("success") and execution.get("work_order"):
                 artifact_uri = await _upload_work_order_artifact(
@@ -62,18 +60,10 @@ async def handle_confirmation_message(
                 if artifact_uri:
                     logger.debug(f"Stored work-order artifact: {artifact_uri}")
                 await websocket.send_json(
-                    {
-                        "type": "work_order",
-                        "data": execution.get("work_order"),
-                    }
+                    ws_messages.work_order_message(execution.get("work_order", {}))
                 )
         else:
-            await websocket.send_json(
-                {
-                    "type": "error",
-                    "data": f"Unknown action_id: {action_id}",
-                }
-            )
+            await websocket.send_json(ws_messages.error_message(f"Unknown action_id: {action_id}"))
 
     elif msg_type == "reject":
         action = confirmation_mgr.reject(action_id, notes)
@@ -90,21 +80,13 @@ async def handle_confirmation_message(
                 )
                 live_request_queue.send_content(content)
             await websocket.send_json(
-                {
-                    "type": "confirmation_result",
-                    "data": {
-                        "action_id": action_id,
-                        "status": "rejected",
-                    },
-                }
+                ws_messages.confirmation_result_message(
+                    action_id=action_id,
+                    status="rejected",
+                )
             )
         else:
-            await websocket.send_json(
-                {
-                    "type": "error",
-                    "data": f"Unknown action_id: {action_id}",
-                }
-            )
+            await websocket.send_json(ws_messages.error_message(f"Unknown action_id: {action_id}"))
 
     elif msg_type == "correct":
         corrections = payload.get("corrections")
@@ -133,15 +115,12 @@ async def handle_confirmation_message(
                 live_request_queue.send_content(content)
 
             await websocket.send_json(
-                {
-                    "type": "confirmation_result",
-                    "data": {
-                        "action_id": action_id,
-                        "status": "corrected",
-                        "corrected_data": action.proposed_data,
-                        "execution": execution,
-                    },
-                }
+                ws_messages.confirmation_result_message(
+                    action_id=action_id,
+                    status="corrected",
+                    corrected_data=action.proposed_data,
+                    execution=execution,
+                )
             )
             if execution.get("success") and execution.get("work_order"):
                 artifact_uri = await _upload_work_order_artifact(
@@ -152,15 +131,7 @@ async def handle_confirmation_message(
                 if artifact_uri:
                     logger.debug(f"Stored work-order artifact: {artifact_uri}")
                 await websocket.send_json(
-                    {
-                        "type": "work_order",
-                        "data": execution.get("work_order"),
-                    }
+                    ws_messages.work_order_message(execution.get("work_order", {}))
                 )
         else:
-            await websocket.send_json(
-                {
-                    "type": "error",
-                    "data": f"Unknown action_id: {action_id}",
-                }
-            )
+            await websocket.send_json(ws_messages.error_message(f"Unknown action_id: {action_id}"))
