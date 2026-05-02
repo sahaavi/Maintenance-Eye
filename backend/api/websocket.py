@@ -15,7 +15,6 @@ Supports:
   - Barge-in / interruption (handled natively by Live API)
 """
 
-import ast
 import asyncio
 import base64
 import json
@@ -25,7 +24,6 @@ import traceback
 from datetime import datetime
 
 from agent.tools.confirm_action import set_session_context
-from agent.tools.work_order import manage_work_order
 from agent.tools.wrapper import get_tool_result_queue, remove_tool_result_queue
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from google.adk.agents.live_request_queue import LiveRequestQueue
@@ -33,8 +31,6 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.genai import types
 from services.auth_service import require_auth_websocket
 from services.confirmation_manager import (
-    ActionType,
-    PendingAction,
     get_confirmation_manager,
     remove_confirmation_manager,
 )
@@ -255,107 +251,6 @@ def _extract_media_cards(tool_result: object) -> list[dict]:
     return cards
 
 
-def _decode_additional_data(value: object) -> dict:
-    """Best-effort parse of additional_data payload from tool input."""
-    if isinstance(value, dict):
-        return value
-    if not isinstance(value, str) or not value.strip():
-        return {}
-    try:
-        parsed = json.loads(value)
-        return parsed if isinstance(parsed, dict) else {}
-    except Exception:
-        pass
-    try:
-        parsed = ast.literal_eval(value)
-        return parsed if isinstance(parsed, dict) else {}
-    except Exception:
-        return {}
-
-
-def _build_action_payload(action: PendingAction) -> dict:
-    """Merge confirmation proposed_data and additional_data into a single dict."""
-    payload = dict(action.proposed_data or {})
-    extra = _decode_additional_data(payload.pop("additional_data", ""))
-    if extra:
-        payload.update(extra)
-    return payload
-
-
-async def _execute_confirmed_action(action: PendingAction) -> dict:
-    """
-    Execute a confirmed/corrected action deterministically.
-    This avoids relying on the model to re-issue tool calls after confirmation.
-    """
-    payload = _build_action_payload(action)
-    action_type = action.action_type
-
-    if action_type == ActionType.CREATE_WORK_ORDER:
-        effective_asset_id = payload.get("asset_id", action.asset_id)
-        effective_description = payload.get("description", action.description)
-        missing_fields = []
-        if not (effective_asset_id or "").strip():
-            missing_fields.append("asset_id")
-        if not (effective_description or "").strip():
-            missing_fields.append("description")
-        if missing_fields:
-            return {
-                "success": False,
-                "error": (
-                    "Cannot execute confirmed create_work_order; missing required fields: "
-                    + ", ".join(missing_fields)
-                ),
-                "missing_fields": missing_fields,
-            }
-
-        return await manage_work_order(
-            action="create",
-            asset_id=effective_asset_id,
-            description=effective_description,
-            problem_code=payload.get("problem_code", ""),
-            fault_code=payload.get("fault_code", ""),
-            action_code=payload.get("action_code", ""),
-            failure_class=payload.get("failure_class", "UNSPECIFIED"),
-            priority=payload.get("priority", "P3"),
-            assigned_to=payload.get("assigned_to", ""),
-            notes=payload.get("notes", action.technician_notes or ""),
-        )
-
-    if action_type == ActionType.UPDATE_WORK_ORDER:
-        return await manage_work_order(
-            action="update",
-            wo_id=payload.get("wo_id", ""),
-            status=payload.get("status", ""),
-            priority=payload.get("priority", ""),
-            notes=payload.get("notes", action.technician_notes or ""),
-        )
-
-    if action_type == ActionType.CLOSE_WORK_ORDER:
-        return await manage_work_order(
-            action="update",
-            wo_id=payload.get("wo_id", ""),
-            status="completed",
-            notes=payload.get(
-                "notes", action.technician_notes or "Closed by technician confirmation"
-            ),
-        )
-
-    if action_type == ActionType.ESCALATE_PRIORITY:
-        return await manage_work_order(
-            action="update",
-            wo_id=payload.get("wo_id", ""),
-            priority=payload.get("priority", ""),
-            notes=payload.get(
-                "notes", action.technician_notes or "Priority escalated by technician confirmation"
-            ),
-        )
-
-    return {
-        "success": False,
-        "error": f"Action type {action_type.value} is not executable via backend automation.",
-    }
-
-
 async def _upload_session_frame(
     session_id: str,
     frame_data: bytes,
@@ -372,20 +267,6 @@ async def _upload_session_frame(
         object_path=object_path,
         content_type="image/jpeg",
     )
-
-
-async def _upload_work_order_artifact(
-    session_id: str,
-    action_id: str,
-    execution_result: dict,
-) -> str | None:
-    """Persist confirmed work-order payload to GCS for audit traceability."""
-    storage = get_storage_service()
-    if not storage.enabled:
-        return None
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%S%fZ")
-    object_path = f"sessions/{session_id}/work_orders/{timestamp}-{action_id}.json"
-    return await storage.upload_json(execution_result, object_path)
 
 
 async def _run_bidi_session(

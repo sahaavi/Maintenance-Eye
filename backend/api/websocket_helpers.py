@@ -1,10 +1,10 @@
 import logging
 from typing import Any
 
-from api.websocket import _execute_confirmed_action, _upload_work_order_artifact
 from fastapi import WebSocket
 from google.genai import types
 from services.confirmation_manager import ConfirmationManager
+from services.confirmation_workflow import ConfirmationWorkflow, upload_work_order_artifact
 
 logger = logging.getLogger("maintenance-eye.websocket.helpers")
 
@@ -21,11 +21,12 @@ async def handle_confirmation_message(
     """Shared handler for Human-in-the-Loop confirmation messages."""
     action_id = payload.get("action_id") or message.get("action_id", "")
     notes = payload.get("notes") or message.get("notes", "")
+    workflow = ConfirmationWorkflow(confirmation_mgr)
 
     if msg_type == "confirm":
-        action = confirmation_mgr.confirm(action_id, notes)
-        if action:
-            execution = await _execute_confirmed_action(action)
+        result = await workflow.confirm(action_id, notes)
+        if result:
+            execution = result.execution or {}
             wo_id = ""
             if execution.get("success") and execution.get("work_order"):
                 wo_id = execution["work_order"].get("wo_id", "")
@@ -54,7 +55,7 @@ async def handle_confirmation_message(
                 }
             )
             if execution.get("success") and execution.get("work_order"):
-                artifact_uri = await _upload_work_order_artifact(
+                artifact_uri = await upload_work_order_artifact(
                     session_id=session_id,
                     action_id=action_id,
                     execution_result=execution,
@@ -76,8 +77,8 @@ async def handle_confirmation_message(
             )
 
     elif msg_type == "reject":
-        action = confirmation_mgr.reject(action_id, notes)
-        if action:
+        result = await workflow.reject(action_id, notes)
+        if result:
             if live_request_queue:
                 content = types.Content(
                     parts=[
@@ -113,9 +114,10 @@ async def handle_confirmation_message(
         if not isinstance(corrections, dict):
             corrections = {}
 
-        action = confirmation_mgr.correct(action_id, corrections, notes)
-        if action:
-            execution = await _execute_confirmed_action(action)
+        result = await workflow.correct(action_id, corrections, notes)
+        if result:
+            action = result.action
+            execution = result.execution or {}
             wo_id = ""
             if execution.get("success") and execution.get("work_order"):
                 wo_id = execution["work_order"].get("wo_id", "")
@@ -144,7 +146,7 @@ async def handle_confirmation_message(
                 }
             )
             if execution.get("success") and execution.get("work_order"):
-                artifact_uri = await _upload_work_order_artifact(
+                artifact_uri = await upload_work_order_artifact(
                     session_id=session_id,
                     action_id=action_id,
                     execution_result=execution,
