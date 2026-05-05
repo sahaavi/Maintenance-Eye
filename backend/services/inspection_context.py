@@ -62,7 +62,7 @@ def is_open_work_order_status(status: object) -> bool:
 
 
 def dump_model(model: Any) -> dict[str, Any]:
-    return cast(dict[str, Any], model.model_dump())
+    return cast(dict[str, Any], model.model_dump(mode="json"))
 
 
 def open_work_orders(work_orders: list[Any]) -> list[Any]:

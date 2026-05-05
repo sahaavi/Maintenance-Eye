@@ -43,6 +43,7 @@ def test_confirmation_http_flow_confirm(client) -> None:
     body = confirm.json()
     assert body["status"] == "confirmed"
     assert body["action"]["technician_notes"] == "confirmed"
+    assert body["execution_status"] == "succeeded"
 
 
 @pytest.mark.integration
@@ -68,3 +69,5 @@ def test_confirmation_http_flow_correct(client) -> None:
     action = response.json()["action"]
     assert action["status"] == "corrected"
     assert action["proposed_data"]["problem_code"] == "EL-101"
+    assert response.json()["execution_status"] == "failed"
+    assert "not executable" in response.json()["execution_error"]

@@ -54,6 +54,46 @@ async def test_smart_search_suggests_asset_confirmation_for_malformed_id(
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_search_work_orders_reports_known_train_car_without_confirmation() -> None:
+    service = SearchService()
+
+    result = await service.search_work_orders(
+        JsonEAM(),
+        query="Hey do you have any work order open for train car 36?",
+    )
+
+    assert result["success"] is True
+    assert result["count"] == 0
+    assert result.get("message") == "No open work orders found for TC-036."
+    assert result.get("attempted_asset_ids") == ["TC-036"]
+    assert "needs_asset_confirmation" not in result
+    assert "no_asset_match" not in result
+    assert "guessed_assets" not in result
+    assert "CAR-36" not in result.get("message", "")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_smart_search_reports_known_train_car_without_confirmation() -> None:
+    service = SearchService()
+
+    result = await service.smart_search(
+        JsonEAM(),
+        query="Hey do you have any work order open for train car 36?",
+    )
+
+    assert result["success"] is True
+    assert result["total"] == 0
+    assert result.get("message") == "No open work orders found for TC-036."
+    assert result.get("attempted_asset_ids") == ["TC-036"]
+    assert "needs_asset_confirmation" not in result
+    assert "no_asset_match" not in result
+    assert "guessed_assets" not in result
+    assert "CAR-36" not in result.get("message", "")
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_smart_search_reports_no_asset_match_for_unknown_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

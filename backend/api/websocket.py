@@ -92,7 +92,7 @@ def _extract_confirmation_request(tool_result: object) -> dict | None:
                 return current
             queue.extend(current.values())
             continue
-        if isinstance(current, (list, tuple)):
+        if isinstance(current, list | tuple):
             queue.extend(current)
             continue
     return None
@@ -240,13 +240,15 @@ def _extract_media_cards(tool_result: object) -> list[dict]:
                         "title": f"Inspection Report: {current.get('report_id')}",
                         "description": None,
                         "image_url": "https://api.dicebear.com/7.x/identicon/svg?seed=report",
-                        "action_link": f"/api/reports/{current.get('report_id')}/pdf",
+                        "action_link": current.get("report_pdf_url")
+                        or f"/api/reports/{current.get('report_id')}/pdf",
+                        "action_label": "Download PDF",
                         "details": details,
                     }
                 )
             queue.extend(current.values())
             continue
-        if isinstance(current, (list, tuple)):
+        if isinstance(current, list | tuple):
             queue.extend(current)
             continue
     return cards

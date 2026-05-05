@@ -55,6 +55,7 @@ def test_confirmation_messages_preserve_nested_payloads() -> None:
         action_id="ACT-001",
         status="corrected",
         execution=execution,
+        execution_status="succeeded",
         corrected_data={"priority": "P2"},
     ) == {
         "type": "confirmation_result",
@@ -63,6 +64,7 @@ def test_confirmation_messages_preserve_nested_payloads() -> None:
             "status": "corrected",
             "corrected_data": {"priority": "P2"},
             "execution": execution,
+            "execution_status": "succeeded",
         },
     }
 

@@ -48,6 +48,16 @@ async def test_json_eam_create_and_update_work_order() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_json_eam_returns_work_orders_latest_first_for_demo_asset() -> None:
+    eam = JsonEAM()
+
+    results = await eam.get_work_orders(asset_id="ESC-SC-003", status=WorkOrderStatus.OPEN)
+
+    assert [wo.wo_id for wo in results[:2]] == ["WO-2026-0152", "WO-2026-0151"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_json_eam_robust_tokenization_and_metadata_search() -> None:
     eam = JsonEAM()
 

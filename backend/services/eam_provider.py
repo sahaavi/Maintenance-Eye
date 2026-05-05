@@ -9,7 +9,8 @@ import logging
 
 import google.auth
 from config import settings
-from google.auth.exceptions import DefaultCredentialsError
+from google.auth.exceptions import DefaultCredentialsError, GoogleAuthError
+from google.auth.transport.requests import Request
 from services.eam_interface import EAMService
 from services.firestore_eam import FirestoreEAM
 from services.json_eam import JsonEAM
@@ -23,14 +24,21 @@ def _has_firestore_runtime() -> bool:
     """
     Detect whether Firestore can be used in this runtime.
     - Emulator host always enables Firestore.
-    - Otherwise require valid ADC credentials.
+    - Otherwise require refreshable ADC credentials.
     """
     if settings.FIRESTORE_EMULATOR_HOST:
         return True
     try:
-        google.auth.default()
-        return True
+        credentials, _ = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        if not credentials.valid:
+            credentials.refresh(Request())
+        return credentials.valid
     except DefaultCredentialsError:
+        return False
+    except GoogleAuthError as exc:
+        logger.warning(f"ADC credentials unavailable for Firestore, falling back to JSON: {exc}")
         return False
     except Exception as exc:
         logger.debug(f"Failed checking ADC credentials: {exc}")

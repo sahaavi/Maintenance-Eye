@@ -7,6 +7,7 @@ logger = logging.getLogger("maintenance-eye.tools.wrapper")
 # Queue of tool results per session
 # Map: session_id -> asyncio.Queue
 _tool_result_queues: dict[str, asyncio.Queue] = {}
+_background_tasks: set[asyncio.Task] = set()
 
 
 def get_tool_result_queue(session_id: str) -> asyncio.Queue:
@@ -34,7 +35,9 @@ def tool_wrapper(func):
     def sync_wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
         # We can't await here, so we use a task
-        asyncio.create_task(_capture_result(result))
+        task = asyncio.create_task(_capture_result(result))
+        _background_tasks.add(task)
+        task.add_done_callback(_background_tasks.discard)
         return result
 
     async def _capture_result(result):

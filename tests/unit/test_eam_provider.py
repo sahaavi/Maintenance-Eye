@@ -66,3 +66,25 @@ def test_provider_falls_back_to_json_eam_when_firestore_init_fails(
     eam = eam_provider.get_eam_service()
 
     assert isinstance(eam, FakeJsonEAM)
+
+
+@pytest.mark.unit
+def test_firestore_runtime_requires_refreshable_adc(monkeypatch: pytest.MonkeyPatch) -> None:
+    from google.auth.exceptions import RefreshError
+    from services import eam_provider  # type: ignore[import-not-found]
+
+    class StaleCredentials:
+        valid = False
+
+        def refresh(self, request) -> None:
+            raise RefreshError("invalid_grant")
+
+    monkeypatch.setattr(eam_provider.settings, "FIRESTORE_EMULATOR_HOST", "")
+    monkeypatch.setattr(
+        eam_provider.google.auth,
+        "default",
+        lambda scopes=None: (StaleCredentials(), "maintenance-eye"),
+    )
+    monkeypatch.setattr(eam_provider, "Request", lambda: object())
+
+    assert eam_provider._has_firestore_runtime() is False

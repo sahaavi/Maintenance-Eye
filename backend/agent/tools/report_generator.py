@@ -9,6 +9,7 @@ from datetime import datetime
 from agent.tools.wrapper import tool_wrapper
 from services.eam_provider import get_eam_service
 from services.inspection_context import build_report_context
+from services.report_registry import store_report
 from services.storage_service import get_storage_service
 
 logger = logging.getLogger("maintenance-eye.tools.report")
@@ -51,6 +52,9 @@ async def generate_report(
             report_id=report_id,
             generated_at=report_date,
         )
+        report["report_html_url"] = f"/api/reports/{report_id}"
+        report["report_pdf_url"] = f"/api/reports/{report_id}/pdf"
+        store_report(report)
 
         logger.info(f"Generated report: {report_id}")
 
@@ -64,6 +68,8 @@ async def generate_report(
             "success": True,
             "report_id": report_id,
             "report": report,
+            "report_html_url": report["report_html_url"],
+            "report_pdf_url": report["report_pdf_url"],
             "report_storage_uri": report_storage_uri,
             "message": f"Inspection report {report_id} generated successfully.",
         }

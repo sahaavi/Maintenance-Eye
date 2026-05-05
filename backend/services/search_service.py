@@ -12,7 +12,8 @@ import logging
 from typing import Any, cast
 
 from models.schemas import WorkOrderStatus
-from services.query_engine import QueryEngine, SearchIntent
+from services.base_eam import BaseEAMService
+from services.query_engine import QueryEngine, SearchIntent, SearchQuery
 
 logger = logging.getLogger("maintenance-eye.search-service")
 
@@ -66,8 +67,9 @@ class SearchService:
                 await self._asset_confirmation_fields(
                     query,
                     eam_service,
+                    parsed=parsed,
                     no_suggestion_message="Ask the user to confirm the exact asset tag.",
-                    no_records_label="records",
+                    no_records_label=self._no_records_label(parsed, "records"),
                 )
             )
         return response
@@ -240,6 +242,7 @@ class SearchService:
                 if wo.wo_id not in existing_ids:
                     result.append(wo)
 
+        result = BaseEAMService.sort_work_orders_latest_first(result)
         response: dict[str, Any] = {
             "success": True,
             "count": len(result),
@@ -250,8 +253,10 @@ class SearchService:
                 await self._asset_confirmation_fields(
                     query,
                     eam_service,
+                    parsed=parsed,
+                    candidate_asset_ids=[asset_id] if asset_id else [],
                     no_suggestion_message="Please confirm the exact asset tag.",
-                    no_records_label="work orders",
+                    no_records_label=self._work_order_no_records_label(wo_status),
                 )
             )
         return response
@@ -275,7 +280,7 @@ class SearchService:
             if not upper.startswith("WO-") and upper not in existing_upper:
                 search_parts.append(upper)
                 existing_upper.add(upper)
-        return cast(
+        records = cast(
             list[Any],
             await eam_service.search_work_orders(
                 q=" ".join(search_parts),
@@ -285,6 +290,7 @@ class SearchService:
                 location=location or parsed.filters.get("location", ""),
             ),
         )
+        return BaseEAMService.sort_work_orders_latest_first(records)
 
     @staticmethod
     def _format_scored_item(scored_item: Any) -> dict[str, Any]:
@@ -328,9 +334,23 @@ class SearchService:
         raw_query: str,
         eam_service: Any,
         *,
+        parsed: SearchQuery | None = None,
+        candidate_asset_ids: list[str] | None = None,
         no_suggestion_message: str,
         no_records_label: str,
     ) -> dict[str, Any]:
+        parsed = parsed or self._engine.build_query(raw_query)
+        known_asset_ids = await self._known_asset_ids(
+            eam_service,
+            list(candidate_asset_ids or []) + list(parsed.extracted_ids),
+        )
+        if known_asset_ids:
+            asset_label = ", ".join(known_asset_ids)
+            return {
+                "attempted_asset_ids": known_asset_ids,
+                "message": f"No {no_records_label} found for {asset_label}.",
+            }
+
         hints = QueryEngine.extract_asset_hints(raw_query)
         suggestions = await self._engine.suggest_asset_candidates(raw_query, eam_service, limit=3)
         if suggestions:
@@ -350,6 +370,36 @@ class SearchService:
                 "message": f"No asset found matching {hinted}. {no_suggestion_message}",
             }
         return {}
+
+    async def _known_asset_ids(
+        self,
+        eam_service: Any,
+        asset_ids: list[str],
+    ) -> list[str]:
+        known_asset_ids: list[str] = []
+        for asset_id in asset_ids:
+            upper = (asset_id or "").upper()
+            if not upper or upper.startswith("WO-"):
+                continue
+            asset = await eam_service.get_asset(upper)
+            if asset and asset.asset_id not in known_asset_ids:
+                known_asset_ids.append(asset.asset_id)
+        return known_asset_ids
+
+    @staticmethod
+    def _work_order_no_records_label(status: WorkOrderStatus | None) -> str:
+        if not status:
+            return "work orders"
+        return f"{status.value.replace('_', ' ')} work orders"
+
+    @staticmethod
+    def _no_records_label(parsed: SearchQuery, fallback: str) -> str:
+        if parsed.intent == SearchIntent.work_order:
+            status = parsed.filters.get("status", "")
+            if status:
+                return f"{status.replace('_', ' ')} work orders"
+            return "work orders"
+        return fallback
 
     @staticmethod
     def _parse_work_order_status(status: str) -> WorkOrderStatus | None:

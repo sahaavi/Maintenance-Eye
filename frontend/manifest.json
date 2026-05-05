@@ -4,7 +4,7 @@
     "description": "AI Co-Pilot for Physical Infrastructure Maintenance Operations",
     "start_url": "/",
     "display": "standalone",
-    "orientation": "portrait",
+    "orientation": "any",
     "background_color": "#0f172a",
     "theme_color": "#0f172a",
     "icons": [

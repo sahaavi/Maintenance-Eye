@@ -139,7 +139,7 @@ class FirestoreEAM(BaseEAMService):
         results = []
         async for doc in docs:
             results.append(WorkOrder(**doc.to_dict()))
-        return results
+        return self.sort_work_orders_latest_first(results)
 
     async def search_work_orders(
         self,
@@ -194,7 +194,7 @@ class FirestoreEAM(BaseEAMService):
                 if not query_matches_text(q, searchable):
                     continue
             results.append(WorkOrder(**wo))
-        return results
+        return self.sort_work_orders_latest_first(results)
 
     async def get_locations(self) -> list[dict]:
         assets = []

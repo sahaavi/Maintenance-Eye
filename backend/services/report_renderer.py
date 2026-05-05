@@ -77,11 +77,11 @@ def render_report_pdf(report_data: dict) -> bytes:
             f"Rendered PDF report: {report_data.get('report_id', '?')} ({len(pdf_bytes)} bytes)"
         )
         return pdf_bytes
-    except ImportError:
+    except ImportError as exc:
         logger.error("WeasyPrint not installed — cannot generate PDF")
         raise RuntimeError(
             "PDF generation requires WeasyPrint. Install with: pip install weasyprint"
-        )
+        ) from exc
     except Exception as e:
         logger.error(f"PDF generation failed: {e}")
         raise

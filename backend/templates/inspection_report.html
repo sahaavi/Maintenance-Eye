@@ -345,19 +345,28 @@
                 </div>
                 <div class="info-item">
                     <div class="info-label">Type</div>
-                    <div class="info-value">{{ report.asset.asset_type | default("N/A") }}</div>
+                    <div class="info-value">{{ report.asset.type | default("N/A") }}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Location</div>
-                    <div class="info-value">{{ report.asset.location | default("N/A") }}</div>
+                    <div class="info-value">
+                        {{ report.asset.location.station | default("N/A") }}
+                        {% if report.asset.location.zone is defined %}
+                        / {{ report.asset.location.zone }}
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Department</div>
-                    <div class="info-value">{{ report.asset.department | default("N/A") }}</div>
+                    <div class="info-value">
+                        {{ report.asset.department | default("N/A") | replace("_", " ") }}
+                    </div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Station</div>
-                    <div class="info-value">{{ report.asset.station | default("N/A") }}</div>
+                    <div class="info-value">
+                        {{ report.asset.location.station | default("N/A") }}
+                    </div>
                 </div>
             </div>
         </div>

@@ -30,6 +30,15 @@ def test_eam_codes_contract_shape(client) -> None:
 
 
 @pytest.mark.api
+def test_eam_codes_filter_accepts_backend_code_type_values(client) -> None:
+    response = client.get("/api/eam-codes", params={"code_type": "problem_code"})
+    assert response.status_code == 200
+    rows = response.json()
+    assert rows
+    assert all(row["code_type"] == "problem_code" for row in rows)
+
+
+@pytest.mark.api
 @pytest.mark.regression
 def test_work_orders_status_filter_is_case_insensitive(client) -> None:
     response = client.get("/api/work-orders", params={"status": "IN_PROGRESS"})

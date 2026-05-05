@@ -16,6 +16,8 @@ const state = {
     ws: null,
     sessionId: null,
     userId: `tech-${crypto.randomUUID().slice(0, 8)}`,
+    selectedAsset: null,
+    selectedAssetId: '',
     mediaStream: null,
     audioContext: null,
     scriptProcessor: null,
@@ -39,7 +41,10 @@ const state = {
     reconnectAttempts: 0,
     reconnectTimer: null,
     intentionalClose: false,
+    pendingConfirmations: {},
 };
+
+window.state = state;
 
 // Audio config
 const SEND_SAMPLE_RATE = 16000;
@@ -302,12 +307,13 @@ function connectWebSocket() {
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
     const wsUrl = `${protocol}//${window.location.host}/ws/inspect/${state.userId}${tokenParam}`;
 
-    console.log('[WS] Connecting:', wsUrl);
+    console.log('[WS] Connecting inspection socket');
     state.intentionalClose = false;
     state.ws = new WebSocket(wsUrl);
 
     state.ws.onopen = () => {
         console.log('[WS] Connected');
+        const wasRetry = state.reconnectAttempts > 0;
         state.isConnected = true;
         state.reconnectAttempts = 0;
         updateConnectionStatus('connected');
@@ -316,8 +322,12 @@ function connectWebSocket() {
         startAudioCapture();
         startVideoStreaming();
 
-        if (state.reconnectAttempts === 0 && state.sessionStartTime) {
-            addAgentMessage('Session reconnected. Previous context may be lost.');
+        if (window.CommandCenter) {
+            window.CommandCenter.sendInspectionStartContext();
+        }
+
+        if (wasRetry && state.sessionStartTime) {
+            addAgentMessage('Connection retry complete. Live context and pending reviews may not be restored.');
         }
     };
 
@@ -530,6 +540,7 @@ function _buildConfirmationCard(actionData, { idPrefix, onConfirm, onReject, onC
 function renderConfirmationCard(actionData) {
     const container = el.confirmationContainer();
     if (!container) return;
+    state.pendingConfirmations[actionData.action_id] = actionData;
 
     const { card, description } = _buildConfirmationCard(actionData, {
         idPrefix: 'confirm-',
@@ -556,30 +567,36 @@ function confirmAction(actionId) {
 }
 
 function rejectAction(actionId) {
-    const notes = prompt('Reason for rejection (optional):') || '';
-    wsSend('reject', { action_id: actionId, notes });
+    if (window.CommandCenter) {
+        window.CommandCenter.openConfirmationEditor({
+            actionId,
+            actionData: state.pendingConfirmations[actionId] || { action_id: actionId },
+            send: (type, data) => window.wsSend(type, data),
+            remove: removeConfirmationCard,
+            mode: 'reject',
+        });
+        return;
+    }
+    wsSend('reject', { action_id: actionId, notes: '' });
     removeConfirmationCard(actionId);
-    addAgentMessage('❌ You rejected the action.');
+    addAgentMessage('You rejected the action.');
 }
 
 function correctAction(actionId) {
-    const input = prompt('What should be changed? (e.g., "priority: P2, problem_code: ME-005")');
-    if (!input) return;
-
-    // Parse simple key: value pairs
-    const corrections = {};
-    input.split(',').forEach(part => {
-        const [key, val] = part.split(':').map(s => s.trim());
-        if (key && val) corrections[key] = val;
-    });
-
-    wsSend('correct', { action_id: actionId, corrections, notes: input });
-    removeConfirmationCard(actionId);
-    addAgentMessage(`✏️ You corrected the action: ${input}`);
+    if (window.CommandCenter) {
+        window.CommandCenter.openConfirmationEditor({
+            actionId,
+            actionData: state.pendingConfirmations[actionId] || { action_id: actionId },
+            send: (type, data) => window.wsSend(type, data),
+            remove: removeConfirmationCard,
+            mode: 'correct',
+        });
+    }
 }
 
 function removeConfirmationCard(actionId) {
     const card = document.getElementById(`confirm-${actionId}`);
+    delete state.pendingConfirmations[actionId];
     if (card) {
         card.style.animation = 'fadeOut 0.3s ease forwards';
         setTimeout(() => card.remove(), 300);
@@ -588,6 +605,15 @@ function removeConfirmationCard(actionId) {
 
 function handleConfirmationResult(data) {
     removeConfirmationCard(data.action_id);
+    const execution = data.execution || {};
+    if (data.execution_status === 'failed' || execution.success === false) {
+        const error = data.execution_error || execution.error || 'Backend execution failed.';
+        addAgentMessage(`Action ${data.action_id} was not completed: ${error}`);
+        return;
+    }
+    if (execution.success && execution.work_order?.wo_id) {
+        addAgentMessage(`Work order ${execution.work_order.wo_id} is ready.`);
+    }
 }
 
 function formatActionType(type) {
@@ -603,11 +629,12 @@ function formatActionType(type) {
 
 // ==================== UI ACTIONS ====================
 
-async function startInspection() {
+async function beginInspectionSession() {
     // Show feedback on splash screen while initializing
     const splashStatus = document.getElementById('splash-status');
     if (splashStatus) {
         splashStatus.textContent = 'Initializing camera and microphone...';
+        splashStatus.className = 'splash-status';
         splashStatus.style.display = 'block';
     }
 
@@ -625,6 +652,10 @@ async function startInspection() {
 
     if (splashStatus) splashStatus.style.display = 'none';
 
+    if (window.CommandCenter) {
+        window.CommandCenter.syncSelectedAssetToInspection();
+    }
+
     el.splashScreen().classList.remove('active');
     el.inspectionScreen().classList.add('active');
 
@@ -634,6 +665,16 @@ async function startInspection() {
 
     connectWebSocket();
 }
+
+async function startInspection() {
+    if (window.CommandCenter && !window.CommandCenter.ensureAssetSelectedBeforeInspection()) {
+        return;
+    }
+    await beginInspectionSession();
+}
+
+window.beginInspectionSession = beginInspectionSession;
+window.startInspection = startInspection;
 
 function trimMessageHistory() {
     const container = el.agentMessages();
@@ -695,6 +736,7 @@ async function endInspection() {
         </div>`;
     el.findingsContainer().innerHTML = '';
     el.confirmationContainer().innerHTML = '';
+    state.pendingConfirmations = {};
 }
 
 function toggleMic() {
@@ -974,7 +1016,11 @@ function updateConnectionStatus(status) {
     if (status === true) status = 'connected';
     if (status === false) status = 'disconnected';
 
-    statusEl.classList.remove('connected', 'reconnecting');
+    statusEl.classList.remove('connected', 'reconnecting', 'failed');
+    statusEl.removeAttribute('tabindex');
+    statusEl.setAttribute('role', 'status');
+    statusEl.removeAttribute('aria-label');
+    statusEl.onclick = null;
     const textEl = statusEl.querySelector('span:last-child');
 
     switch (status) {
@@ -987,16 +1033,25 @@ function updateConnectionStatus(status) {
             textEl.textContent = `Reconnecting... (${state.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
             break;
         case 'failed':
+            statusEl.classList.add('failed');
+            statusEl.setAttribute('role', 'button');
+            statusEl.setAttribute('tabindex', '0');
+            statusEl.setAttribute('aria-label', 'Connection lost. Retry connection.');
             textEl.textContent = 'Connection lost. Tap to retry.';
             statusEl.onclick = () => {
-                state.reconnectAttempts = 0;
-                connectWebSocket();
-                statusEl.onclick = null;
+                if (!state.isConnected && typeof window.connectWebSocket === 'function') {
+                    state.reconnectAttempts = 0;
+                    window.connectWebSocket();
+                }
             };
             break;
         default:
             textEl.textContent = 'Ready to connect';
             break;
+    }
+
+    if (window.CommandCenter) {
+        window.CommandCenter.makeConnectionRetryAccessible();
     }
 }
 
@@ -1040,7 +1095,10 @@ const chatState = {
     reconnectAttempts: 0,
     reconnectTimer: null,
     intentionalClose: false,
+    pendingConfirmations: {},
 };
+
+window.chatState = chatState;
 
 function toggleChatPanel() {
     const panel = document.getElementById('chat-panel');
@@ -1048,6 +1106,7 @@ function toggleChatPanel() {
     if (panel.style.display === 'none') {
         panel.style.display = 'flex';
         btn.style.display = 'none';
+        btn.setAttribute('aria-expanded', 'true');
         connectChatWebSocket();
     } else {
         closeChatPanel();
@@ -1059,6 +1118,7 @@ function closeChatPanel() {
     const btn = document.getElementById('btn-chat-toggle');
     panel.style.display = 'none';
     btn.style.display = '';
+    btn.setAttribute('aria-expanded', 'false');
     disconnectChat();
     stopChatVoice();
     closeChatImageSourcePicker();
@@ -1071,7 +1131,7 @@ function connectChatWebSocket() {
     if (token) params.set('token', token);
     const wsUrl = `${protocol}//${window.location.host}/ws/chat/${state.userId}?${params}`;
 
-    console.log('[Chat WS] Connecting:', wsUrl);
+    console.log('[Chat WS] Connecting chat socket');
     chatState.intentionalClose = false;
     chatState.ws = new WebSocket(wsUrl);
 
@@ -1136,6 +1196,7 @@ function disconnectChat() {
         chatState.ws = null;
     }
     chatState.isConnected = false;
+    chatState.pendingConfirmations = {};
     updateConnectionStatus('disconnected');
 }
 
@@ -1152,6 +1213,10 @@ function handleChatServerMessage(msg) {
 
         case 'confirmation_result':
             removeChatConfirmationCard(msg.data.action_id);
+            if (msg.data.execution_status === 'failed' || msg.data.execution?.success === false) {
+                const error = msg.data.execution_error || msg.data.execution?.error || 'Backend execution failed.';
+                addChatMessage('agent', `Action ${msg.data.action_id} was not completed: ${error}`);
+            }
             break;
 
         case 'work_order':
@@ -1384,6 +1449,17 @@ function setChatStatus(text) {
 function renderChatConfirmationCard(actionData) {
     const container = document.getElementById('chat-confirmation-container');
     if (!container) return;
+    chatState.pendingConfirmations[actionData.action_id] = actionData;
+
+    const panel = document.getElementById('chat-panel');
+    const toggle = document.getElementById('btn-chat-toggle');
+    if (panel && panel.style.display === 'none') {
+        panel.style.display = 'flex';
+        if (toggle) {
+            toggle.style.display = 'none';
+            toggle.setAttribute('aria-expanded', 'true');
+        }
+    }
 
     const { card, description } = _buildConfirmationCard(actionData, {
         idPrefix: 'chat-confirm-',
@@ -1403,27 +1479,36 @@ function chatConfirmAction(actionId) {
 }
 
 function chatRejectAction(actionId) {
-    const notes = prompt('Reason for rejection (optional):') || '';
-    chatWsSend('reject', { action_id: actionId, notes });
+    if (window.CommandCenter) {
+        window.CommandCenter.openConfirmationEditor({
+            actionId,
+            actionData: chatState.pendingConfirmations[actionId] || { action_id: actionId },
+            send: (type, data) => window.chatWsSend(type, data),
+            remove: removeChatConfirmationCard,
+            mode: 'reject',
+        });
+        return;
+    }
+    chatWsSend('reject', { action_id: actionId, notes: '' });
     removeChatConfirmationCard(actionId);
     addChatMessage('agent', 'You rejected the action.');
 }
 
 function chatCorrectAction(actionId) {
-    const input = prompt('What should be changed? (e.g., "priority: P2, problem_code: ME-005")');
-    if (!input) return;
-    const corrections = {};
-    input.split(',').forEach(part => {
-        const [key, val] = part.split(':').map(s => s.trim());
-        if (key && val) corrections[key] = val;
-    });
-    chatWsSend('correct', { action_id: actionId, corrections, notes: input });
-    removeChatConfirmationCard(actionId);
-    addChatMessage('agent', `You corrected the action: ${input}`);
+    if (window.CommandCenter) {
+        window.CommandCenter.openConfirmationEditor({
+            actionId,
+            actionData: chatState.pendingConfirmations[actionId] || { action_id: actionId },
+            send: (type, data) => window.chatWsSend(type, data),
+            remove: removeChatConfirmationCard,
+            mode: 'correct',
+        });
+    }
 }
 
 function removeChatConfirmationCard(actionId) {
     const card = document.getElementById(`chat-confirm-${actionId}`);
+    delete chatState.pendingConfirmations[actionId];
     if (card) {
         card.style.animation = 'fadeOut 0.3s ease forwards';
         setTimeout(() => card.remove(), 300);
@@ -1507,6 +1592,7 @@ function renderChatMediaCard(data) {
 let currentPage = 'work-orders';
 let _pageSearchTimeouts = {};
 let _filtersLoaded = false;
+let _pageLoadTokens = {};
 
 function showDashboard() {
     document.getElementById('splash-screen').classList.remove('active');
@@ -1516,6 +1602,9 @@ function showDashboard() {
         _filtersLoaded = true;
     }
     navigateTo('work-orders');
+    if (window.CommandCenter) {
+        void window.CommandCenter.loadDashboardSummary();
+    }
 }
 
 window.hideDashboard = function hideDashboard() {
@@ -1719,7 +1808,11 @@ async function loadFilterOptions() {
     ];
     const PRIORITIES = ['P1', 'P2', 'P3', 'P4', 'P5'];
     const STATUSES = ['open', 'in_progress', 'on_hold', 'completed', 'cancelled'];
-    const CODE_TYPES = ['Problem Code', 'Fault Code', 'Action Code'];
+    const CODE_TYPES = [
+        { value: 'problem_code', label: 'Problem Code' },
+        { value: 'fault_code', label: 'Fault Code' },
+        { value: 'action_code', label: 'Action Code' },
+    ];
 
     // WO filters
     populateDropdown('wo-filter-status', STATUSES, s => formatLabel(s));
@@ -1730,7 +1823,7 @@ async function loadFilterOptions() {
     // KB filter
     populateDropdown('kb-filter-department', DEPARTMENTS);
     // EAM filters
-    populateDropdown('eam-filter-type', CODE_TYPES, t => formatLabel(t));
+    populateDropdown('eam-filter-type', CODE_TYPES);
     populateDropdown('eam-filter-department', DEPARTMENTS);
 
     // Load locations for WO filter + asset station filter
@@ -1773,6 +1866,8 @@ function debouncePageSearch(page) {
 // --- Generic page data loader ---
 
 async function loadPageData(pageId, endpoint, getFilters, renderFn, postFilter) {
+    const token = (_pageLoadTokens[pageId] || 0) + 1;
+    _pageLoadTokens[pageId] = token;
     showPageState(pageId, 'loading');
     try {
         const params = new URLSearchParams();
@@ -1781,12 +1876,14 @@ async function loadPageData(pageId, endpoint, getFilters, renderFn, postFilter) 
             if (val) params.set(key, val);
         }
         const data = await apiFetch(`${endpoint}?${params}`);
+        if (_pageLoadTokens[pageId] !== token) return;
         let items = Array.isArray(data) ? data : [];
         if (postFilter) items = postFilter(items);
         if (items.length === 0) { showPageState(pageId, 'empty'); return; }
         renderFn(items);
         showPageState(pageId, 'data');
     } catch (err) {
+        if (_pageLoadTokens[pageId] !== token) return;
         showPageState(pageId, 'error');
         console.error(`Error loading ${pageId}:`, err);
     }
@@ -1854,8 +1951,21 @@ function renderAssetsGrid(assets) {
             </div>
             ${item.manufacturer ? `<div class="card-detail">Mfg: ${escapeHtml(item.manufacturer)}</div>` : ''}
             ${item.status ? `<div class="card-status status-${statusClass}">${escapeHtml(String(item.status).toUpperCase())}</div>` : ''}
+            <button type="button" class="asset-card-action" data-asset-id="${escapeHtml(item.asset_id || '')}">
+                Inspect
+            </button>
         `;
         grid.appendChild(card);
+    });
+    grid.querySelectorAll('.asset-card-action').forEach((button) => {
+        button.addEventListener('click', () => {
+            const asset = assets.find((item) => item.asset_id === button.dataset.assetId);
+            if (!asset || !window.CommandCenter) return;
+            window.CommandCenter.selectAsset(asset);
+            window.CommandCenter.closeAssetPicker?.();
+            window.hideDashboard();
+            startInspection();
+        });
     });
 }
 
@@ -1964,6 +2074,15 @@ function renderEAMCodesTable(codes) {
 function getAuthToken() {
     return window.localStorage.getItem('firebase_id_token') || '';
 }
+
+window.connectWebSocket = connectWebSocket;
+window.updateConnectionStatus = updateConnectionStatus;
+window.renderConfirmationCard = renderConfirmationCard;
+window.renderChatConfirmationCard = renderChatConfirmationCard;
+window.wsSend = wsSend;
+window.chatWsSend = chatWsSend;
+window.apiFetch = apiFetch;
+window.getAuthToken = getAuthToken;
 
 // ==================== SERVICE WORKER ====================
 

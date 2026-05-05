@@ -85,6 +85,12 @@ def test_extract_asset_hints_for_malformed_id() -> None:
 
 
 @pytest.mark.unit
+def test_extract_asset_hints_ignores_train_car_phrase() -> None:
+    hints = QueryEngine.extract_asset_hints("Hey do you have any work order open for train car 36?")
+    assert hints == []
+
+
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_suggest_asset_candidates_for_malformed_id() -> None:
     engine = QueryEngine()
@@ -114,6 +120,33 @@ async def test_execute_search_handles_natural_open_work_order_question() -> None
     wo_ids = {item.item.wo_id for item in result.items if item.entity_type == "work_order"}
     assert "WO-2026-0151" in wo_ids
     assert "WO-2026-0152" in wo_ids
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_execute_search_latest_work_orders_are_latest_first() -> None:
+    engine = QueryEngine()
+    eam = JsonEAM()
+
+    parsed = engine.build_query("what is the last work order for ESC-SC-003")
+    result = await engine.execute_search(parsed, eam, limit=10)
+
+    wo_ids = [item.item.wo_id for item in result.items if item.entity_type == "work_order"]
+    assert wo_ids[:2] == ["WO-2026-0152", "WO-2026-0151"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_execute_search_cache_key_includes_limit() -> None:
+    engine = QueryEngine()
+    eam = JsonEAM()
+
+    parsed = engine.build_query("open work orders for ESC-SC-003")
+    first = await engine.execute_search(parsed, eam, limit=1)
+    second = await engine.execute_search(parsed, eam, limit=10)
+
+    assert len(first.items) == 1
+    assert len(second.items) >= 2
 
 
 @pytest.mark.unit

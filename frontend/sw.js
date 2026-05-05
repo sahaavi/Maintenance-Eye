@@ -1,12 +1,14 @@
 // Maintenance-Eye Service Worker
 // Provides offline support and PWA functionality
 
-const CACHE_NAME = 'maintenance-eye-v14';
+const CACHE_NAME = 'maintenance-eye-v15';
 const ASSETS = [
     '/',
     '/index.html',
     '/style.css',
+    '/command-center.css',
     '/app.js',
+    '/command-center.js',
     '/manifest.json',
     '/icons/icon-192.png',
     '/icons/icon-512.png',
@@ -37,6 +39,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     // Skip non-GET and WebSocket requests
     if (event.request.method !== 'GET' || event.request.url.includes('/ws/')) {
+        return;
+    }
+
+    const url = new URL(event.request.url);
+    if (url.pathname.startsWith('/api/')) {
+        event.respondWith(fetch(event.request));
         return;
     }
 

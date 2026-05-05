@@ -8,6 +8,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 from models.schemas import WorkOrderStatus
+from services.base_eam import BaseEAMService
 from services.eam_provider import get_eam_service
 from services.search_service import SearchService
 
@@ -68,7 +69,8 @@ async def get_work_orders(
             status=wo_status,
             location=location,
         )
-    return await eam.get_work_orders(asset_id=asset_id, status=wo_status)
+    work_orders = await eam.get_work_orders(asset_id=asset_id, status=wo_status)
+    return BaseEAMService.sort_work_orders_latest_first(work_orders)
 
 
 @router.get("/locations")
@@ -136,6 +138,7 @@ async def confirm_action(session_id: str, action_id: str, notes: str = ""):
         "status": result.status,
         "action": result.action.model_dump(),
         "execution": result.execution,
+        **_execution_status_fields(result.execution),
     }
 
 
@@ -168,6 +171,7 @@ async def correct_action(
         "status": result.status,
         "action": result.action.model_dump(),
         "execution": result.execution,
+        **_execution_status_fields(result.execution),
     }
 
 
@@ -178,6 +182,17 @@ async def get_session_stats(session_id: str):
 
     mgr = get_confirmation_manager(session_id)
     return {"session_id": session_id, **mgr.get_stats()}
+
+
+def _execution_status_fields(execution: dict | None) -> dict[str, str | None]:
+    if execution is None:
+        return {"execution_status": None, "execution_error": None}
+    if execution.get("success"):
+        return {"execution_status": "succeeded", "execution_error": None}
+    return {
+        "execution_status": "failed",
+        "execution_error": str(execution.get("error") or "Execution failed"),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -242,4 +257,35 @@ async def generate_report_pdf(
         headers={
             "Content-Disposition": f'attachment; filename="{report_id}.pdf"',
         },
+    )
+
+
+@router.get("/reports/{report_id}")
+async def get_report_html(report_id: str):
+    """Return a previously generated inspection report as HTML."""
+    from fastapi.responses import HTMLResponse
+    from services.report_registry import get_report
+    from services.report_renderer import render_report_html
+
+    report = get_report(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return HTMLResponse(content=render_report_html(report))
+
+
+@router.get("/reports/{report_id}/pdf")
+async def get_report_pdf(report_id: str):
+    """Return a previously generated inspection report as a PDF."""
+    from fastapi.responses import Response
+    from services.report_registry import get_report
+    from services.report_renderer import render_report_pdf
+
+    report = get_report(report_id)
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    pdf_bytes = render_report_pdf(report)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{report_id}.pdf"'},
     )

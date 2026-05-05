@@ -38,7 +38,7 @@ class _FakeCollection:
         self._filters = list(filters or [])
 
     def where(self, *, filter: Any):
-        return _FakeCollection(self._docs, self._filters + [filter])
+        return _FakeCollection(self._docs, [*self._filters, filter])
 
     def stream(self):
         docs = list(self._docs)
@@ -97,3 +97,46 @@ async def test_firestore_search_work_orders_handles_nullable_assigned_to() -> No
 
     assert len(results) == 1
     assert results[0].wo_id == "WO-2026-0152"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_firestore_work_orders_are_returned_latest_first() -> None:
+    work_orders = [
+        {
+            "wo_id": "WO-2026-0151",
+            "asset_id": "ESC-SC-003",
+            "status": "open",
+            "priority": "P2",
+            "problem_code": "ME-003",
+            "fault_code": "WEAR-SUR",
+            "action_code": "REPAIR",
+            "failure_class": "MECHANICAL",
+            "description": "Older order",
+            "created_at": "2026-02-20T14:30:00.000000",
+        },
+        {
+            "wo_id": "WO-2026-0152",
+            "asset_id": "ESC-SC-003",
+            "status": "open",
+            "priority": "P4",
+            "problem_code": "ME-003",
+            "fault_code": "LUB-DRY",
+            "action_code": "LUBRICATE",
+            "failure_class": "MECHANICAL",
+            "description": "Newest order",
+            "created_at": "2026-02-20T14:45:00.000000",
+        },
+    ]
+    assets = [{"asset_id": "ESC-SC-003", "name": "Escalator", "location": {"station": "SC"}}]
+
+    eam = FirestoreEAM.__new__(FirestoreEAM)
+    eam.db = _FakeDB(work_orders=work_orders, assets=assets)
+
+    results = await FirestoreEAM.get_work_orders(
+        eam,
+        asset_id="ESC-SC-003",
+        status=WorkOrderStatus.OPEN,
+    )
+
+    assert [wo.wo_id for wo in results] == ["WO-2026-0152", "WO-2026-0151"]

@@ -79,11 +79,11 @@ async def require_auth_http(request: Request) -> AuthContext:
         )
     try:
         return _verify_token(token)
-    except Exception:
+    except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid auth token",
-        )
+        ) from exc
 
 
 async def require_auth_websocket(websocket: WebSocket) -> AuthContext | None:

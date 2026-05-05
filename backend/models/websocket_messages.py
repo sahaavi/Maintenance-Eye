@@ -58,6 +58,8 @@ class ConfirmationResultPayload(BaseModel):
     status: Literal["confirmed", "rejected", "corrected"]
     corrected_data: dict[str, Any] | None = None
     execution: dict[str, Any] | None = None
+    execution_status: Literal["succeeded", "failed"] | None = None
+    execution_error: str | None = None
 
 
 class ConfirmationResultMessage(BaseModel):
@@ -146,6 +148,8 @@ def confirmation_result_message(
     *,
     corrected_data: dict[str, Any] | None = None,
     execution: dict[str, Any] | None = None,
+    execution_status: Literal["succeeded", "failed"] | None = None,
+    execution_error: str | None = None,
 ) -> dict[str, Any]:
     payload_args: dict[str, Any] = {
         "action_id": action_id,
@@ -155,6 +159,10 @@ def confirmation_result_message(
         payload_args["corrected_data"] = corrected_data
     if execution is not None:
         payload_args["execution"] = execution
+    if execution_status is not None:
+        payload_args["execution_status"] = execution_status
+    if execution_error is not None:
+        payload_args["execution_error"] = execution_error
     return _dump(ConfirmationResultMessage(data=ConfirmationResultPayload(**payload_args)))
 
 

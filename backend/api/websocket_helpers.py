@@ -1,5 +1,5 @@
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import WebSocket
 from google.genai import types
@@ -8,6 +8,43 @@ from services.confirmation_manager import ConfirmationManager
 from services.confirmation_workflow import ConfirmationWorkflow, upload_work_order_artifact
 
 logger = logging.getLogger("maintenance-eye.websocket.helpers")
+
+
+ExecutionStatus = Literal["succeeded", "failed"]
+
+
+def _execution_status(execution: dict | None) -> tuple[ExecutionStatus | None, str | None]:
+    if execution is None:
+        return None, None
+    if execution.get("success"):
+        return "succeeded", None
+    return "failed", str(execution.get("error") or "Execution failed")
+
+
+def _confirmation_system_text(
+    action_id: str,
+    execution: dict,
+    *,
+    corrected: bool = False,
+) -> str:
+    action_label = "CORRECTED" if corrected else "CONFIRMED"
+    if execution.get("success"):
+        wo_id = ""
+        if execution.get("work_order"):
+            wo_id = execution["work_order"].get("wo_id", "")
+        return (
+            f"[SYSTEM] Action {action_id} was {action_label} and EXECUTED by the backend. "
+            f"{'Work order ' + wo_id + ' was created. ' if wo_id else ''}"
+            "Do NOT call manage_work_order again; the action is complete. "
+            "Just acknowledge the result to the technician briefly."
+        )
+
+    error = execution.get("error") or "Execution failed"
+    return (
+        f"[SYSTEM] Action {action_id} was {action_label}, but backend execution FAILED: "
+        f"{error}. Do NOT say the action is complete. Tell the technician briefly and ask "
+        "whether they want to correct the action or retry."
+    )
 
 
 async def handle_confirmation_message(
@@ -28,20 +65,11 @@ async def handle_confirmation_message(
         result = await workflow.confirm(action_id, notes)
         if result:
             execution = result.execution or {}
-            wo_id = ""
-            if execution.get("success") and execution.get("work_order"):
-                wo_id = execution["work_order"].get("wo_id", "")
+            execution_status, execution_error = _execution_status(execution)
 
             if live_request_queue:
                 content = types.Content(
-                    parts=[
-                        types.Part(
-                            text=f"[SYSTEM] Action {action_id} was CONFIRMED and ALREADY EXECUTED by the system. "
-                            f"{'Work order ' + wo_id + ' was created. ' if wo_id else ''}"
-                            f"Do NOT call manage_work_order again — the action is complete. "
-                            f"Just acknowledge the result to the technician briefly."
-                        )
-                    ]
+                    parts=[types.Part(text=_confirmation_system_text(action_id, execution))]
                 )
                 live_request_queue.send_content(content)
 
@@ -50,6 +78,8 @@ async def handle_confirmation_message(
                     action_id=action_id,
                     status="confirmed",
                     execution=execution,
+                    execution_status=execution_status,
+                    execution_error=execution_error,
                 )
             )
             if execution.get("success") and execution.get("work_order"):
@@ -100,17 +130,17 @@ async def handle_confirmation_message(
         if result:
             action = result.action
             execution = result.execution or {}
-            wo_id = ""
-            if execution.get("success") and execution.get("work_order"):
-                wo_id = execution["work_order"].get("wo_id", "")
+            execution_status, execution_error = _execution_status(execution)
 
             if live_request_queue:
                 content = types.Content(
                     parts=[
                         types.Part(
-                            text=f"[SYSTEM] Action {action_id} was CORRECTED and ALREADY EXECUTED with updated values. "
-                            f"{'Work order ' + wo_id + ' was created. ' if wo_id else ''}"
-                            f"Do NOT call manage_work_order again. Just acknowledge briefly."
+                            text=_confirmation_system_text(
+                                action_id,
+                                execution,
+                                corrected=True,
+                            )
                         )
                     ]
                 )
@@ -122,6 +152,8 @@ async def handle_confirmation_message(
                     status="corrected",
                     corrected_data=action.proposed_data,
                     execution=execution,
+                    execution_status=execution_status,
+                    execution_error=execution_error,
                 )
             )
             if execution.get("success") and execution.get("work_order"):

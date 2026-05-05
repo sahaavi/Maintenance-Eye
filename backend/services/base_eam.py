@@ -36,6 +36,28 @@ class BaseEAMService(EAMService):
             )
         return normalized_updates
 
+    @staticmethod
+    def _record_value(record: object, field: str) -> object:
+        if isinstance(record, dict):
+            return record.get(field, "")
+        return getattr(record, field, "")
+
+    @classmethod
+    def work_order_sort_key(cls, work_order: object) -> tuple[str, str]:
+        """Sort work orders by newest creation timestamp, then highest WO ID."""
+        created_at = cls._record_value(work_order, "created_at") or cls._record_value(
+            work_order, "created_date"
+        )
+        if hasattr(created_at, "isoformat"):
+            created_at = created_at.isoformat()
+        wo_id = cls._record_value(work_order, "wo_id")
+        return str(created_at or ""), str(wo_id or "")
+
+    @classmethod
+    def sort_work_orders_latest_first(cls, work_orders: list[Any]) -> list[Any]:
+        """Return work orders in deterministic latest-first order."""
+        return sorted(work_orders, key=cls.work_order_sort_key, reverse=True)
+
     # --- Shared search helpers ---
 
     # Words that describe document type, not content — strip from KB queries
@@ -87,9 +109,11 @@ class BaseEAMService(EAMService):
                 wo.get("description", "") or "",
                 wo.get("asset_id", "") or "",
                 asset.get("name", "") or "",
-                asset.get("location", {}).get("station", "")
-                if isinstance(asset.get("location"), dict)
-                else "",
+                (
+                    asset.get("location", {}).get("station", "")
+                    if isinstance(asset.get("location"), dict)
+                    else ""
+                ),
                 wo.get("problem_code", "") or "",
                 wo.get("fault_code", "") or "",
                 wo.get("action_code", "") or "",

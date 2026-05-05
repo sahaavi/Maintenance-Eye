@@ -142,7 +142,7 @@ class JsonEAM(BaseEAMService):
             if status and wo.get("status") != status.value:
                 continue
             results.append(WorkOrder(**wo))
-        return results
+        return self.sort_work_orders_latest_first(results)
 
     async def search_work_orders(
         self,
@@ -175,7 +175,7 @@ class JsonEAM(BaseEAMService):
                 if not query_matches_text(q, searchable):
                     continue
             results.append(WorkOrder(**wo))
-        return results
+        return self.sort_work_orders_latest_first(results)
 
     async def get_locations(self) -> list[dict]:
         return self.aggregate_stations(iter(self._assets.values()))

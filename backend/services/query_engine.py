@@ -99,6 +99,11 @@ NOISE_WORDS = frozenset(
         "where",
         "which",
         "how",
+        "last",
+        "latest",
+        "newest",
+        "recent",
+        "previous",
         "please",
         "can",
         "you",
@@ -408,6 +413,7 @@ _SHORT_ASSET_HINT_PATTERN = re.compile(
     r"\b([A-Z]{2,3})[-\s]?(\d{1,4})\b",
     re.IGNORECASE,
 )
+_ASSET_HINT_PREFIX_STOPWORDS = frozenset({"CAR"})
 
 _ID_SEPARATOR_WORDS = {"dash", "hyphen", "minus"}
 
@@ -462,12 +468,15 @@ class _QueryCache:
         self._ttl = ttl_seconds
         self._max_size = max_size
 
-    def _make_key(self, query: SearchQuery) -> str:
-        raw = f"{query.intent}|{'|'.join(query.normalized_terms)}|{'|'.join(query.extracted_ids)}|{query.filters}"
+    def _make_key(self, query: SearchQuery, limit: int) -> str:
+        raw = (
+            f"{query.intent}|{'|'.join(query.normalized_terms)}|"
+            f"{'|'.join(query.extracted_ids)}|{query.filters}|limit={limit}"
+        )
         return hashlib.md5(raw.encode()).hexdigest()
 
-    def get(self, query: SearchQuery) -> SearchResult | None:
-        key = self._make_key(query)
+    def get(self, query: SearchQuery, limit: int) -> SearchResult | None:
+        key = self._make_key(query, limit)
         entry = self._cache.get(key)
         if entry and (time.time() - entry[0]) < self._ttl:
             return entry[1]
@@ -475,11 +484,11 @@ class _QueryCache:
             del self._cache[key]
         return None
 
-    def put(self, query: SearchQuery, result: SearchResult) -> None:
+    def put(self, query: SearchQuery, result: SearchResult, limit: int) -> None:
         if len(self._cache) >= self._max_size:
             oldest_key = min(self._cache, key=lambda k: self._cache[k][0])
             del self._cache[oldest_key]
-        key = self._make_key(query)
+        key = self._make_key(query, limit)
         self._cache[key] = (time.time(), result)
 
 
@@ -549,7 +558,7 @@ class QueryEngine:
         limit: int = 10,
     ) -> SearchResult:
         """Execute the search against the EAM service and return ranked results."""
-        cached = self._cache.get(query)
+        cached = self._cache.get(query, limit)
         if cached is not None:
             return cached
 
@@ -579,7 +588,7 @@ class QueryEngine:
                 query=query,
                 search_time_ms=round((time.time() - t0) * 1000, 1),
             )
-            self._cache.put(query, result)
+            self._cache.put(query, result, limit)
             return result
 
         # 2) Intent-routed search
@@ -615,7 +624,7 @@ class QueryEngine:
             query=query,
             search_time_ms=round((time.time() - t0) * 1000, 1),
         )
-        self._cache.put(query, result)
+        self._cache.put(query, result, limit)
         return result
 
     @staticmethod
@@ -681,7 +690,7 @@ class QueryEngine:
         hints: list[str] = []
         for match in _SHORT_ASSET_HINT_PATTERN.finditer(raw_input):
             prefix = match.group(1).upper()
-            if prefix in {"WO"}:
+            if prefix in {"WO"} or prefix in _ASSET_HINT_PREFIX_STOPWORDS:
                 continue
             num = QueryEngine._normalize_numeric_hint(match.group(2))
             if not num:
@@ -955,9 +964,9 @@ class QueryEngine:
                     continue
                 num = m.group(2).zfill(3)
                 candidate = f"{prefix}-{num}"
-                normalized = QueryEngine.normalize_asset_id(candidate)
-                if normalized:
-                    _append_id(normalized)
+                normalized_id = QueryEngine.normalize_asset_id(candidate)
+                if normalized_id:
+                    _append_id(normalized_id)
 
         # Partial WO IDs like "wo 10234" or "wo10234"
         if not ids:
@@ -1183,7 +1192,7 @@ class QueryEngine:
         # Do NOT strip department/asset_type words because they are also
         # meaningful content terms for knowledge base and asset searches
         # (e.g., "signal", "controller", "escalator" are search-relevant).
-        strip_tokens = set()
+        strip_tokens: set[str] = set()
         for alias, canonical in PRIORITY_ALIASES.items():
             if canonical == filters.get("priority"):
                 strip_tokens.update(
@@ -1226,7 +1235,7 @@ class QueryEngine:
         if abs(len(left) - len(right)) > 1:
             return False
         if len(left) == len(right):
-            return sum(1 for a, b in zip(left, right) if a != b) == 1
+            return sum(1 for a, b in zip(left, right, strict=True) if a != b) == 1
         # insertion/deletion distance of one
         shorter, longer = (left, right) if len(left) < len(right) else (right, left)
         i = j = edits = 0

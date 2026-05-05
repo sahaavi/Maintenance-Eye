@@ -89,6 +89,27 @@ def test_extract_media_cards_supports_work_order_and_zero_result_summary() -> No
     assert cards[1]["title"] == "Work Order: WO-2026-0166"
 
 
+def test_extract_media_cards_uses_report_download_link() -> None:
+    cards = _extract_media_cards(
+        {
+            "report_id": "RPT-20260505-120000",
+            "overall_condition": "requires_attention",
+            "report_pdf_url": "/api/reports/RPT-20260505-120000/pdf",
+        }
+    )
+
+    assert cards == [
+        {
+            "title": "Inspection Report: RPT-20260505-120000",
+            "description": None,
+            "image_url": "https://api.dicebear.com/7.x/identicon/svg?seed=report",
+            "action_link": "/api/reports/RPT-20260505-120000/pdf",
+            "action_label": "Download PDF",
+            "details": [{"label": "Condition", "value": "Requires Attention"}],
+        }
+    ]
+
+
 @pytest.mark.asyncio
 async def test_execute_confirmed_create_requires_asset_id() -> None:
     workflow = ConfirmationWorkflow(ConfirmationManager("ws-test-session-asset"))
