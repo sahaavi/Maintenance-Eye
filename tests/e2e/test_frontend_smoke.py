@@ -212,6 +212,65 @@ def test_chat_panel_toggle(page: Page, static_server: str) -> None:
 
 @pytest.mark.e2e
 @pytest.mark.slow
+def test_chat_panel_controls_fit_common_viewports(page: Page, static_server: str) -> None:
+    route_demo_api(page)
+    install_media_mocks(page, include_websocket=True)
+
+    viewports = [
+        {"width": 320, "height": 568},
+        {"width": 375, "height": 667},
+        {"width": 390, "height": 844},
+        {"width": 414, "height": 896},
+        {"width": 768, "height": 1024},
+        {"width": 1280, "height": 800},
+    ]
+    visible_selectors = [
+        "#chat-panel",
+        ".chat-input-bar",
+        "#btn-chat-attach",
+        "#chat-input",
+        "#btn-chat-voice",
+        "#btn-chat-send",
+    ]
+
+    for viewport_size in viewports:
+        page.set_viewport_size(viewport_size)
+        page.goto(static_server, wait_until="domcontentloaded", timeout=SETTINGS.e2e_timeout_ms)
+        page.get_by_test_id("open-chat").click()
+        page.locator("#chat-panel").wait_for(state="visible", timeout=SETTINGS.e2e_timeout_ms)
+
+        metrics = page.evaluate(
+            """
+            () => ({
+              width: window.visualViewport?.width ?? window.innerWidth,
+              height: window.visualViewport?.height ?? window.innerHeight,
+              clientWidth: document.documentElement.clientWidth,
+              scrollWidth: document.documentElement.scrollWidth,
+              bodyScrollWidth: document.body.scrollWidth
+            })
+            """
+        )
+
+        for selector in visible_selectors:
+            box = page.locator(selector).bounding_box()
+            assert box is not None, f"{selector} missing at {viewport_size}"
+            assert box["width"] > 0, f"{selector} has no width at {viewport_size}"
+            assert box["height"] > 0, f"{selector} has no height at {viewport_size}"
+            assert box["x"] >= -1, f"{selector} overflows left at {viewport_size}: {box}"
+            assert box["x"] + box["width"] <= metrics["width"] + 1, (
+                f"{selector} overflows right at {viewport_size}: {box}"
+            )
+            assert box["y"] >= -1, f"{selector} overflows top at {viewport_size}: {box}"
+            assert box["y"] + box["height"] <= metrics["height"] + 1, (
+                f"{selector} overflows bottom at {viewport_size}: {box}"
+            )
+
+        assert metrics["scrollWidth"] <= metrics["clientWidth"] + 1
+        assert metrics["bodyScrollWidth"] <= metrics["clientWidth"] + 1
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
 def test_dashboard_renders_command_center_metrics_when_data_loads(
     page: Page, static_server: str
 ) -> None:

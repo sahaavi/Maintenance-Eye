@@ -530,7 +530,14 @@ textarea:focus-visible,
 }
 
 @media (max-width: 720px) {
-    .ops-status-rail,
+    #splash-screen {
+        align-items: stretch;
+        justify-content: flex-start;
+        padding:
+            calc(var(--safe-area-top) + 12px) max(12px, var(--safe-area-right))
+            calc(var(--safe-area-bottom) + 12px) max(12px, var(--safe-area-left));
+    }
+
     .dashboard-summary,
     .asset-picker-filters,
     .editor-grid,
@@ -538,9 +545,18 @@ textarea:focus-visible,
         grid-template-columns: 1fr;
     }
 
+    .ops-status-rail {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ops-status-item:last-child {
+        grid-column: 1 / -1;
+    }
+
     .splash-content {
         max-width: 100%;
-        padding: 16px;
+        margin: 0 auto;
+        padding: 0;
         grid-template-columns: 1fr;
     }
 
@@ -550,6 +566,19 @@ textarea:focus-visible,
     .selected-asset-panel,
     .status-bar {
         grid-column: 1;
+    }
+
+    #btn-start,
+    #btn-dashboard,
+    #btn-chat-toggle {
+        width: 100%;
+        max-width: none;
+        min-height: 48px;
+    }
+
+    .selected-asset-panel {
+        min-height: 0;
+        padding: 12px;
     }
 
     .asset-picker-dialog {
@@ -590,8 +619,7 @@ textarea:focus-visible,
 
 @media (max-width: 420px) {
     .splash-content {
-        gap: 18px;
-        padding: 16px;
+        gap: 12px;
     }
 
     #agent-panel {
@@ -604,6 +632,41 @@ textarea:focus-visible,
 
     .confirm-actions {
         flex-direction: column;
+    }
+}
+
+@media (max-height: 700px) and (max-width: 720px) {
+    .splash-content {
+        gap: 10px;
+    }
+
+    .logo-container {
+        gap: 4px;
+    }
+
+    .logo-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .logo-text {
+        font-size: 24px;
+    }
+
+    .logo-tagline {
+        display: none;
+    }
+
+    .ops-status-item {
+        padding: 8px 10px;
+    }
+
+    #selected-asset-name {
+        font-size: 16px;
+    }
+
+    #selected-asset-meta {
+        font-size: 12px;
     }
 }
 

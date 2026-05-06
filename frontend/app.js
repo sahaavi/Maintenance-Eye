@@ -1100,11 +1100,45 @@ const chatState = {
 
 window.chatState = chatState;
 
+let chatViewportSyncBound = false;
+
+function getDefaultChatPlaceholder() {
+    const viewportWidth = window.visualViewport?.width || window.innerWidth;
+    return viewportWidth <= 360 ? 'Ask Max...' : 'Ask Max anything...';
+}
+
+function updateChatInputPlaceholder() {
+    if (chatState.isVoiceMode) return;
+    const input = document.getElementById('chat-input');
+    if (input) input.placeholder = getDefaultChatPlaceholder();
+}
+
+function syncChatViewportHeight() {
+    const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    if (!viewportHeight) return;
+    document.documentElement.style.setProperty('--chat-viewport-height', `${viewportHeight}px`);
+    updateChatInputPlaceholder();
+}
+
+function bindChatViewportSync() {
+    if (chatViewportSyncBound) return;
+    chatViewportSyncBound = true;
+    syncChatViewportHeight();
+    window.addEventListener('resize', syncChatViewportHeight);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncChatViewportHeight);
+        window.visualViewport.addEventListener('scroll', syncChatViewportHeight);
+    }
+}
+
 function toggleChatPanel() {
     const panel = document.getElementById('chat-panel');
     const btn = document.getElementById('btn-chat-toggle');
     if (panel.style.display === 'none') {
+        bindChatViewportSync();
+        syncChatViewportHeight();
         panel.style.display = 'flex';
+        document.body.classList.add('chat-open');
         btn.style.display = 'none';
         btn.setAttribute('aria-expanded', 'true');
         connectChatWebSocket();
@@ -1117,6 +1151,7 @@ function closeChatPanel() {
     const panel = document.getElementById('chat-panel');
     const btn = document.getElementById('btn-chat-toggle');
     panel.style.display = 'none';
+    document.body.classList.remove('chat-open');
     btn.style.display = '';
     btn.setAttribute('aria-expanded', 'false');
     disconnectChat();
@@ -1401,8 +1436,7 @@ function stopChatVoice() {
         try { chatState.recognition.stop(); } catch (e) { /* ignore */ }
         chatState.recognition = null;
     }
-    const input = document.getElementById('chat-input');
-    if (input) input.placeholder = 'Ask Max anything...';
+    updateChatInputPlaceholder();
     setChatStatus(chatState.isConnected ? 'Online' : 'Offline');
 }
 
@@ -1454,7 +1488,10 @@ function renderChatConfirmationCard(actionData) {
     const panel = document.getElementById('chat-panel');
     const toggle = document.getElementById('btn-chat-toggle');
     if (panel && panel.style.display === 'none') {
+        bindChatViewportSync();
+        syncChatViewportHeight();
         panel.style.display = 'flex';
+        document.body.classList.add('chat-open');
         if (toggle) {
             toggle.style.display = 'none';
             toggle.setAttribute('aria-expanded', 'true');
