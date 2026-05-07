@@ -27,7 +27,7 @@ flowchart LR
 
         GEMINI["Gemini 2.5 Flash<br/>Live API<br/>(native audio)"]
         FS["Cloud Firestore<br/>(EAM Data)"]
-        GCS["Cloud Storage<br/>(Photos)"]
+        GCS["Cloud Storage<br/>(Frame snapshots<br/>+ JSON artifacts)"]
     end
 
     CAM -- "video frames" --> WS
@@ -41,7 +41,8 @@ flowchart LR
     GEMINI --> TOOLS
 
     TOOLS --> |"lookup_asset<br/>smart_search<br/>manage_work_order<br/>get_safety_protocol<br/>propose_action<br/>..."| FS
-    TOOLS --> GCS
+    TOOLS --> |"report JSON<br/>work-order artifacts"| GCS
+    WS --> |"periodic frame snapshots"| GCS
     REST <--> FS
     CM <--> WS
 

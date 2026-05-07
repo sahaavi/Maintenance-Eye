@@ -1,11 +1,11 @@
 #!/bin/bash
 # =============================================================================
 # Maintenance-Eye — One-Command Deployment Script
-# Deploys to GCP using Terraform + Cloud Build
+# Deploys to GCP using Cloud Build + optional Terraform
 #
 # Prerequisites:
 #   1. gcloud CLI installed and authenticated
-#   2. Terraform installed
+#   2. Terraform installed for full IaC provisioning
 #   3. GCP project created
 #   4. Gemini API key from https://aistudio.google.com/apikey
 #
@@ -105,6 +105,6 @@ echo "  ✅ Deployment Complete!"
 echo "  URL: $SERVICE_URL"
 echo "  Health: ${SERVICE_URL}/health"
 echo ""
-echo "  Firestore auto-seeds on first request if empty."
+echo "  Firestore auto-seeds during application startup if empty."
 echo "  Check: curl ${SERVICE_URL}/health"
 echo "============================================"

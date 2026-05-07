@@ -1,7 +1,7 @@
-# Cloud Build — Automated CI/CD for Maintenance-Eye
+# Cloud Build — Build and Deploy for Maintenance-Eye
 # Builds Docker image, pushes to Artifact Registry, deploys to Cloud Run.
 #
-# Trigger: Push to main branch (or manual)
+# Trigger: Manual submit or an externally configured Cloud Build trigger
 # Usage:  gcloud builds submit --config=cloudbuild.yaml
 
 substitutions:

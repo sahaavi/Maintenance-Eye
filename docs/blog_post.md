@@ -70,7 +70,7 @@ This layer is what makes voice-driven equipment lookup reliable in noisy field e
 
 ## Human-in-the-Loop: The AI Never Acts Alone
 
-For a maintenance system, reliability isn't optional. An AI that creates incorrect work orders or misclassifies fault codes erodes trust faster than it builds it. I implemented a strict 3-layer validation system:
+For a maintenance system, reliability isn't optional. An AI that creates incorrect work orders or misclassifies fault codes erodes trust faster than it builds it. I implemented a 3-stage confirmation system:
 
 **Layer 1 — Proposal**: When Max determines an action is needed (creating a work order, escalating a priority, closing a ticket), he calls the `propose_action` tool instead of executing directly. This generates a structured proposal with all required fields.
 
@@ -79,7 +79,7 @@ For a maintenance system, reliability isn't optional. An AI that creates incorre
 - **Reject**: Cancel the action entirely
 - **Correct**: Edit the priority, problem code, or description before executing
 
-**Layer 3 — Verification**: After execution, the system validates data integrity — confirming the work order was created with the correct fields and the database state is consistent.
+**Layer 3 — Backend execution**: After confirmation, the backend executes the mutation through a confirmation-only workflow with required-field validation and returns an execution result. This demo does not include a separate audit-grade read-after-write verification pass.
 
 The principle: Max is a tool for the technician, not a replacement for their expertise. The AI recommends, the human decides.
 
@@ -97,11 +97,11 @@ Maintenance-Eye is not a wrapper around a single API call. The ADK agent has 9 p
 | `search_knowledge_base` | Repair procedures, technical manuals, troubleshooting guides |
 | `manage_work_order` | Create, update, close, and search work orders |
 | `get_safety_protocol` | PPE requirements, LOTO procedures, hazard warnings |
-| `generate_report` | Inspection reports with photos, findings, and recommendations |
+| `generate_report` | Inspection reports with findings, open work orders, and recommendations |
 | `propose_action` | Human-in-the-loop confirmation for critical actions |
 | `check_pending_actions` | View unconfirmed proposals awaiting technician decision |
 
-The agent is grounded in real data: 125 assets, 145 work orders, 85 EAM codes, 45 inspection records, and 27 knowledge base entries — modeled after real SkyTrain maintenance operations across 6 departments (Rolling Stock, Guideway, Power, Signal & Telecom, Facilities, and Elevating Devices).
+The agent is grounded in real data: 125 assets, 146 work orders, 85 EAM codes, 45 inspection records, and 27 knowledge base entries — modeled after real SkyTrain maintenance operations across 6 departments (Rolling Stock, Guideway, Power, Signal & Telecom, Facilities, and Elevating Devices).
 
 ---
 
@@ -113,19 +113,19 @@ Every layer of Maintenance-Eye runs on Google Cloud services:
 
 - **Google ADK (Agent Development Kit)** — Agent orchestration framework. Handles tool binding, session management, and the `LiveRequestQueue` that bridges the WebSocket to the Gemini Live API. Version 1.10 with full barge-in interruption support.
 
-- **Cloud Run** — Serverless container hosting with 0-3 autoscaling instances and session affinity. The backend scales to zero when idle, keeping costs minimal during development.
+- **Cloud Run** — Serverless container hosting with 0-3 autoscaling instances. The Cloud Build deployment path enables session affinity, and the backend scales to zero when idle, keeping costs minimal during development.
 
-- **Cloud Firestore** — NoSQL database storing assets, work orders, inspection records, EAM codes, and knowledge base entries. The system automatically falls back to a local JSON-based EAM service when Firestore is unavailable, ensuring the app works offline.
+- **Cloud Firestore** — NoSQL database storing assets, work orders, inspection records, EAM codes, and knowledge base entries. When Firestore credentials are unavailable, the backend falls back to local JSON seed data for local/demo use; API and WebSocket interactions still require a reachable backend.
 
-- **Cloud Storage** — Stores inspection photos and generated PDF reports for compliance documentation.
+- **Cloud Storage** — Stores best-effort audit artifacts: periodic session frame snapshots, confirmed work-order JSON artifacts, and generated report JSON. PDF reports are rendered on demand from process-local report data.
 
-- **Cloud Build** — CI/CD pipeline that builds Docker images on every push to main and deploys automatically.
+- **Cloud Build** — Builds and deploys the container when invoked manually or by an externally configured trigger. GitHub Actions handles the committed test workflow.
 
 - **Artifact Registry** — Docker image repository for versioned container builds.
 
-- **Secret Manager** — Secure storage for API keys and credentials, referenced by Cloud Run at runtime.
+- **Secret Manager** — Runtime source for API keys and credentials referenced by Cloud Run. The deployment path handles secret material, so Terraform state and command history need appropriate protection for production keys.
 
-Infrastructure is fully automated with Terraform and a one-command deployment script — from zero to running in a single `./scripts/deploy.sh` call.
+The demo infrastructure path is automated with Terraform and a one-command deployment script. By default it creates a public unauthenticated demo deployment; production use should enable Firebase Auth, restrict CORS, and apply least-privilege runtime IAM.
 
 ---
 
@@ -137,7 +137,7 @@ Infrastructure is fully automated with Terraform and a one-command deployment sc
 
 **The Firestore emulator is essential**: Rapid iteration on database queries without cloud costs or latency made development dramatically faster. I could test the full agent-to-database pipeline locally in seconds.
 
-**Vanilla JS PWA was the right call**: No build step, no framework overhead. The frontend is 4 files (HTML, CSS, JS, service worker) that handle WebSocket streaming, camera capture at 2 FPS, microphone capture at 16kHz, audio playback at 24kHz, confirmation card UI, and a full 5-page enterprise data explorer. Sometimes the simplest architecture is the most robust.
+**Vanilla JS PWA was the right call**: No build step, no framework overhead. The frontend is a static PWA centered on `index.html`, `app.js`, `style.css`, `command-center.js`, `command-center.css`, `sw.js`, and `manifest.json`. It handles WebSocket streaming, camera capture at 2 FPS, microphone capture at 16kHz, audio playback at 24kHz, confirmation card UI, chat, and a full 5-page enterprise data explorer. Sometimes the simplest architecture is the most robust.
 
 ---
 

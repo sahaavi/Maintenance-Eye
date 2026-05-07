@@ -7,7 +7,7 @@ Point your phone camera at equipment. Speak naturally. Your AI co-pilot sees, di
 [![Built with Google ADK](https://img.shields.io/badge/Google_ADK-Agent_Framework-4285F4?logo=google&logoColor=white)](https://google.github.io/adk-docs/)
 [![Gemini 2.5 Flash](https://img.shields.io/badge/Gemini_2.5_Flash-Live_API-EA4335?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Deployed on Cloud Run](https://img.shields.io/badge/Cloud_Run-Deployed-0F9D58?logo=googlecloud&logoColor=white)](https://cloud.google.com/run)
-[![Tests](https://img.shields.io/badge/Tests-56_Passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-140_collected-blue)](tests/)
 [![Terraform](https://img.shields.io/badge/IaC-Terraform-7B42BC?logo=terraform&logoColor=white)](terraform/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -47,7 +47,7 @@ Max is a 20-year senior maintenance engineer -- professional, calm, safety-consc
 
 ### Human-in-the-Loop Safety
 
-Critical actions go through 3-layer validation: the agent proposes an action, the technician confirms via a visual card on screen (Confirm / Reject / Correct), and post-execution verification ensures data integrity. The AI never creates a work order, escalates a priority, or closes a ticket without explicit human approval.
+Critical actions go through a backend-enforced confirmation workflow: the agent proposes an action, the technician confirms, rejects, or corrects it via a visual card, and confirmed actions execute through deterministic backend code with required-field validation. The AI cannot create a work order, escalate a priority, or close a ticket directly; those mutations require explicit human approval.
 
 ### ASR-Aware Intelligent Search
 
@@ -55,7 +55,7 @@ Speech-to-text splits equipment IDs unpredictably -- "ESC-SC-003" becomes "e s c
 
 ### Enterprise Dashboard
 
-A 5-page data explorer provides full visibility into maintenance operations: Work Orders, Assets, Locations, Knowledge Base, and EAM Codes. Each page supports search, multi-criteria filtering, and responsive layout (sidebar nav on desktop, bottom nav on mobile).
+A 5-page data explorer provides visibility into maintenance operations: Work Orders, Assets, Locations, Knowledge Base, and EAM Codes. Work Orders, Assets, Knowledge Base, and EAM Codes support search and filtering; Locations provides a grouped station overview. The layout is responsive, with sidebar navigation on desktop and bottom navigation on mobile.
 
 ---
 
@@ -63,7 +63,7 @@ A 5-page data explorer provides full visibility into maintenance operations: Wor
 
 ![Maintenance-Eye Architecture](docs/architecture.png)
 
-The Phone PWA captures camera frames (2 FPS JPEG) and microphone audio (PCM 16kHz), streaming them via WebSocket to the FastAPI backend on Cloud Run. The ADK Runner forwards media to the Gemini 2.5 Flash Live API for real-time multimodal reasoning. The agent invokes 9 specialized tools to query Firestore, manage work orders, and enforce safety protocols. Responses stream back as PCM 24kHz audio, text transcripts, and confirmation cards.
+The Phone PWA captures camera frames (2 FPS JPEG) and microphone audio (PCM 16kHz), streaming them via WebSocket to the FastAPI backend on Cloud Run. The ADK Runner forwards media to the Gemini 2.5 Flash Live API for real-time multimodal reasoning. The agent invokes 9 specialized tools to query the active EAM backend, manage work orders, and enforce safety protocols. Responses stream back as PCM 24kHz audio, text transcripts, media cards, and confirmation cards.
 
 ---
 
@@ -79,7 +79,7 @@ The agent has 9 specialized tools -- this is not a wrapper around a single API c
 | `search_knowledge_base` | Repair procedures, manuals, troubleshooting guides | "Escalator step chain lubrication procedure" |
 | `manage_work_order` | Create, update, close, and search work orders | "Create P2 work order for handrail wear" |
 | `get_safety_protocol` | PPE requirements, LOTO procedures, hazard warnings | "Safety protocol for high-voltage cabinet" |
-| `generate_report` | Inspection reports with photos and recommendations | "Generate end-of-shift report" |
+| `generate_report` | Inspection reports with findings, open work orders, and recommendations | "Generate end-of-shift report" |
 | `propose_action` | Human-in-the-loop confirmation for critical actions | Renders confirmation card in UI |
 | `check_pending_actions` | View unconfirmed proposals awaiting decision | "Any pending confirmations?" |
 
@@ -93,10 +93,10 @@ The agent has 9 specialized tools -- this is not a wrapper around a single API c
 | Agent Framework | Google ADK (Agent Development Kit) v1.10 |
 | Backend | Python 3.12 + FastAPI (fully async) |
 | Frontend | Vanilla HTML/CSS/JS Progressive Web App |
-| Database | Google Cloud Firestore |
-| Storage | Google Cloud Storage |
+| Database | Google Cloud Firestore with JSON-backed local/demo fallback |
+| Storage | Google Cloud Storage for best-effort frame snapshots, report JSON, and work-order artifacts |
 | Hosting | Google Cloud Run (0-3 autoscaling instances) |
-| CI/CD | Cloud Build + Artifact Registry + GitHub Actions |
+| CI/CD | GitHub Actions test workflow + Cloud Build deployment config |
 | IaC | Terraform |
 | Containerization | Docker (multi-stage build, Python 3.12-slim) |
 
@@ -110,16 +110,17 @@ Open the live deployment on your phone:
 
 1. Navigate to **https://maintenance-eye-swrz6daraq-uc.a.run.app**
 2. Tap **Start Inspection**
-3. Allow camera and microphone access
-4. Point your camera at any equipment (or a photo of equipment on another screen)
-5. Speak: *"What do you see? Are there any issues?"*
-6. Try: *"Create a work order for this"* -- you will see a confirmation card appear
-7. Try interrupting Max mid-sentence to test barge-in
+3. Choose an inspection asset
+4. Allow camera and microphone access
+5. Point your camera at equipment or a photo of equipment on another screen
+6. Speak: *"What do you see? Are there any issues?"*
+7. Try: *"Create a work order for this"* -- you will see a confirmation card appear
+8. Try interrupting Max mid-sentence to test barge-in
 
 ### Option 2: Explore the Dashboard
 
 1. Open the same URL on a desktop browser
-2. Click **Dashboard** in the header
+2. Tap **Browse Data** on the home screen
 3. Browse the 5 data pages: Work Orders, Assets, Locations, Knowledge Base, EAM Codes
 4. Try searching: *"pump vibration"* or filter by priority *P1*
 
@@ -129,14 +130,14 @@ Open the live deployment on your phone:
 # Health check
 curl https://maintenance-eye-swrz6daraq-uc.a.run.app/health
 
-# Readiness check (validates Firestore connectivity)
+# Readiness check (validates the active EAM backend; check eam_backend)
 curl https://maintenance-eye-swrz6daraq-uc.a.run.app/readiness
 
-# List assets via REST API
-curl https://maintenance-eye-swrz6daraq-uc.a.run.app/api/assets?limit=5
+# Search assets via REST API
+curl "https://maintenance-eye-swrz6daraq-uc.a.run.app/api/assets?q=escalator"
 
-# List work orders
-curl https://maintenance-eye-swrz6daraq-uc.a.run.app/api/work-orders?limit=5
+# Filter work orders
+curl "https://maintenance-eye-swrz6daraq-uc.a.run.app/api/work-orders?status=open&priority=P1"
 ```
 
 ### What to Look For
@@ -146,6 +147,8 @@ curl https://maintenance-eye-swrz6daraq-uc.a.run.app/api/work-orders?limit=5
 - Confirmation cards for critical actions (human-in-the-loop)
 - Barge-in: interrupt Max mid-sentence and he stops immediately
 - ASR intelligence: say equipment IDs naturally ("wo ten two three four") and Max resolves them
+
+The hosted URL is a public unauthenticated demo using synthetic data. It is suitable for trying the workflow, not as a production-secured deployment.
 
 ---
 
@@ -167,7 +170,7 @@ cp .env.example .env
 # Edit .env with your GCP project ID and Gemini API key
 ```
 
-### 2. Install dependencies
+### 2. Install runtime dependencies
 
 ```bash
 cd backend
@@ -200,9 +203,15 @@ python3 ../scripts/seed_data.py
 
 ### 6. Run tests
 
+From the repository root, install the development dependencies and run the test layer you need:
+
 ```bash
-python3 -m pytest -o "addopts=" tests/unit/ -v   # 56 unit tests
+./scripts/setup_test_env.sh
+source .venv/bin/activate
+python -m pytest tests/unit -o "addopts=" -v   # 92 unit tests
 ```
+
+For the full local quality gate, run `TEST_ENV=dev ./scripts/run_test_suite.sh`.
 
 ---
 
@@ -211,12 +220,21 @@ python3 -m pytest -o "addopts=" tests/unit/ -v   # 56 unit tests
 ### One-command deployment
 
 ```bash
-./scripts/deploy.sh <project-id> <gemini-api-key> [region]
+./scripts/deploy.sh <project-id> <gemini-api-key> [region] [allowed-origins]
 ```
 
-This script enables required GCP APIs, creates an Artifact Registry repository, stores the API key in Secret Manager, builds the Docker image via Cloud Build, deploys to Cloud Run via Terraform, and grants Firestore IAM permissions. Data auto-seeds on first request.
+This script enables required GCP APIs, creates or updates the Artifact Registry repository and Gemini Secret Manager secret, builds the container with Cloud Build, and deploys Cloud Run. If Terraform is installed, it also provisions Firestore, the GCS bucket, Secret Manager resources, Artifact Registry, and Cloud Run from `terraform/`. Without Terraform, Firestore database and GCS bucket creation are not handled by the script.
+
+Firestore auto-seeding runs during application startup when the active backend is `FirestoreEAM` and the Firestore `assets` collection is empty. `/readiness` validates the active EAM backend; check that `eam_backend` is `FirestoreEAM` when you need to confirm Cloud Firestore is in use.
+
+The provided deployment path is public demo mode by default (`ENABLE_AUTH=false`, unauthenticated Cloud Run invoker). For production, enable Firebase Auth, restrict CORS, configure an explicit Cloud Run service account, grant least-privilege Firestore/Secret Manager/Storage IAM roles, and protect Terraform state because deployment handles secret material.
 
 ### Manual Terraform deployment
+
+Manual Terraform deployment assumes the backend image already exists at
+`<region>-docker.pkg.dev/<project-id>/maintenance-eye/backend:latest`. For first-time
+deployments, the `deploy.sh` path is the safer route because it creates the image before
+Terraform points Cloud Run at it.
 
 ```bash
 cd terraform
@@ -250,7 +268,7 @@ Maintenance-Eye/
 │   │   ├── eam_interface.py       # Abstract EAM service interface
 │   │   ├── base_eam.py            # Shared search helpers
 │   │   ├── json_eam.py            # JSON file fallback (local dev)
-│   │   ├── firestore_eam.py       # Firestore implementation (production)
+│   │   ├── firestore_eam.py       # Cloud Firestore implementation
 │   │   ├── query_engine.py        # NLP pre-query intelligence layer
 │   │   ├── search_matcher.py      # Token-aware text matching
 │   │   ├── confirmation_manager.py # Human-in-the-loop action tracking
@@ -258,19 +276,21 @@ Maintenance-Eye/
 │   └── models/
 │       └── schemas.py             # Pydantic data models
 ├── frontend/
-│   ├── index.html                 # PWA entry (3 screens: splash, inspection, dashboard)
-│   ├── style.css                  # Enterprise dashboard styles
+│   ├── index.html                 # PWA entry (home, inspection, dashboard, chat panel)
+│   ├── style.css                  # Core PWA styles
+│   ├── command-center.css         # Dashboard, asset picker, confirmation editor styles
 │   ├── app.js                     # Client: WebSocket, camera, mic, audio playback, UI
-│   ├── sw.js                      # Service worker (offline caching)
+│   ├── command-center.js          # Dashboard summary, asset picker, confirmation editor
+│   ├── sw.js                      # Service worker (static asset caching)
 │   └── manifest.json              # PWA manifest
-├── tests/                         # Unit, integration, security & E2E tests
-├── data/                          # Seed data (125 assets, 145 WOs, 85 EAM codes)
+├── tests/                         # Unit, integration, API, system, security, AI, data, performance & E2E tests
+├── data/                          # Seed data (125 assets, 146 WOs, 85 EAM codes)
 ├── terraform/                     # Infrastructure as Code (Cloud Run + IAM)
 ├── scripts/                       # Deployment, seeding & test scripts
 ├── docs/                          # Architecture diagram
 ├── .github/workflows/             # CI pipeline (lint, security, tests)
 ├── Dockerfile                     # Multi-stage container build
-├── cloudbuild.yaml                # Cloud Build CI/CD config
+├── cloudbuild.yaml                # Cloud Build build/deploy config
 └── .env.example                   # Environment variable template
 ```
 
@@ -282,12 +302,12 @@ Maintenance-Eye/
 |---------|------|
 | **Gemini 2.5 Flash** (Live API) | Real-time multimodal AI with native audio -- the agent's brain |
 | **Google ADK** | Agent framework with tool orchestration, session management, LiveRequestQueue |
-| **Cloud Run** | Serverless container hosting with autoscaling (0-3 instances) and session affinity |
-| **Cloud Firestore** | NoSQL database for assets, work orders, inspections, EAM codes, knowledge base |
-| **Cloud Storage** | Inspection photos and generated PDF reports |
-| **Cloud Build** | CI/CD pipeline -- builds Docker images on push |
+| **Cloud Run** | Serverless container hosting with autoscaling (0-3 instances). The Cloud Build deploy path enables session affinity. |
+| **Cloud Firestore** | NoSQL database for assets, work orders, inspections, EAM codes, and knowledge base; local/demo fallback uses JSON seed data |
+| **Cloud Storage** | Best-effort audit artifacts: periodic frame snapshots, confirmed work-order JSON, and generated report JSON |
+| **Cloud Build** | Builds and deploys the container when invoked manually or by an externally configured trigger |
 | **Artifact Registry** | Docker image repository |
-| **Secret Manager** | Secure API key storage |
+| **Secret Manager** | Runtime API key source for Cloud Run; protect deployment inputs and Terraform state |
 
 ---
 
@@ -303,20 +323,20 @@ Speech-to-text splits equipment IDs unpredictably -- "ESC-SC-003" becomes "e s c
 
 ### Human-in-the-Loop Safety (Key Design Decision)
 
-Safety-critical work order creation requires multi-layered validation. I enforce required fields at three independent checkpoints: proposal (agent calls `propose_action`), tool execution (confirmation card rendered in UI), and post-confirmation automation (data integrity verification). No single layer can be bypassed. This design was modeled after real SkyTrain maintenance operations across 6 departments with P1-P5 priority classification.
+Safety-critical work order creation requires multi-layered validation. The proposal tool requires core fields before a confirmation card can be rendered, the UI lets the technician confirm/reject/correct the proposal, and the backend executes confirmed mutations through a confirmation-only code path. This design was modeled after real SkyTrain maintenance operations across 6 departments with P1-P5 priority classification.
 
 ### What I Learned
 
 - Native audio models need specific PCM sample rate matching (16kHz input, 24kHz output) -- mismatches produce silence or garbled audio
 - ADK `send_realtime(blob)` takes a single positional argument, not a keyword argument -- subtle API detail that caused debugging time
 - Firestore emulator is essential for rapid iteration without cloud costs
-- A vanilla JS PWA avoids build-step complexity while delivering a full mobile experience with camera, microphone, and offline caching
+- A static vanilla JS PWA avoids build-step complexity while delivering camera, microphone, chat, dashboard, and service-worker shell caching
 
 ---
 
 ## Domain Context
 
-Modeled after SkyTrain maintenance operations with 6 departments: Rolling Stock, Guideway, Power, Signal & Telecom, Facilities, and Elevating Devices. The EAM data model follows industry-standard classification: Problem Code, Fault Code, and Action Code. Priorities range from P1 (critical safety) through P5 (planned maintenance). The seed dataset includes 125 assets, 145 work orders, 85 EAM codes, 45 inspection records, and 27 knowledge base entries.
+Modeled after SkyTrain maintenance operations with 6 departments: Rolling Stock, Guideway, Power, Signal & Telecom, Facilities, and Elevating Devices. The EAM data model follows industry-standard classification: Problem Code, Fault Code, and Action Code. Priorities range from P1 (critical safety) through P5 (planned maintenance). The seed dataset includes 125 assets, 146 work orders, 85 EAM codes, 45 inspection records, and 27 knowledge base entries.
 
 ---
 

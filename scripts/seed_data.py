@@ -3,12 +3,12 @@
 Maintenance-Eye — Synthetic Data Seeder
 Populates Firestore (or emulator) with realistic transit maintenance data.
 
-Generates:
-- 80 Assets across 6 departments
-- 60 EAM codes (problem, fault, action)
-- 150 Work orders
-- 40 Inspection records with findings
-- 25 Knowledge base entries
+Generates the current demo seed dataset:
+- 125 assets across 6 departments
+- 85 EAM codes (problem, fault, action)
+- 146 work orders
+- 45 inspection records with findings
+- 27 knowledge base entries
 
 Run:
     # With emulator running:
@@ -422,7 +422,7 @@ def generate_assets():
 
 
 def generate_work_orders(assets, eam_codes):
-    """Generate 150 work orders linked to assets."""
+    """Generate the demo work orders linked to assets."""
     problem_codes = [c for c in eam_codes if c["code_type"] == "problem_code"]
     fault_codes = [c for c in eam_codes if c["code_type"] == "fault_code"]
     action_codes = [c for c in eam_codes if c["code_type"] == "action_code"]
