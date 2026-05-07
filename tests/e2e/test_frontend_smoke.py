@@ -469,6 +469,64 @@ def test_inspection_start_sends_top_level_asset_id(page: Page, static_server: st
 
 @pytest.mark.e2e
 @pytest.mark.slow
+def test_capture_photo_reports_when_socket_is_not_ready(page: Page, static_server: str) -> None:
+    route_demo_api(page)
+    install_media_mocks(page, include_websocket=True)
+    page.add_init_script(
+        """
+        window.__wsSendCalls = [];
+        window.__forceSocketFailure = () => {
+          window.wsSend = (type, data) => {
+            window.__wsSendCalls.push({ type, data });
+            return false;
+          };
+        };
+        """
+    )
+
+    page.goto(static_server, wait_until="networkidle", timeout=SETTINGS.e2e_timeout_ms)
+    page.get_by_test_id("start-inspection").click()
+    page.get_by_test_id("asset-option-AHU-07").click()
+    page.get_by_test_id("confirm-asset-selection").click()
+    page.locator("#inspection-screen.active").wait_for(
+        state="visible", timeout=SETTINGS.e2e_timeout_ms
+    )
+    page.evaluate(
+        """
+        const video = document.getElementById('camera-feed');
+        Object.defineProperty(video, 'videoWidth', { configurable: true, value: 1280 });
+        Object.defineProperty(video, 'videoHeight', { configurable: true, value: 720 });
+        """
+    )
+    page.evaluate("window.__forceSocketFailure()")
+    page.locator("#btn-capture").click()
+
+    assert "Connection is not ready" in page.locator("#agent-messages").inner_text()
+    assert "Photo captured and sent" not in page.locator("#agent-messages").inner_text()
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_duplicate_final_transcript_replaces_fragment_bubble(
+    page: Page, static_server: str
+) -> None:
+    page.goto(static_server, wait_until="domcontentloaded", timeout=SETTINGS.e2e_timeout_ms)
+
+    page.evaluate(
+        """
+        window.addTranscript('Max', 'I see minor corrosion.');
+        window.addTranscript('Max', 'I see minor corrosion.');
+        """
+    )
+
+    transcript_text = page.locator(
+        "#agent-messages .transcript-agent .transcript-text"
+    ).inner_text()
+    assert transcript_text.strip() == "I see minor corrosion."
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
 def test_start_inspection_ignores_duplicate_start_while_media_pending(
     page: Page, static_server: str
 ) -> None:

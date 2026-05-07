@@ -52,7 +52,7 @@ window.state = state;
 const SEND_SAMPLE_RATE = 16000;
 const RECEIVE_SAMPLE_RATE = 24000;
 const CAPTURE_BUFFER_SIZE = 4096;
-const VIDEO_FPS = 2;
+const VIDEO_FPS = 1;
 const VIDEO_QUALITY = 0.65;
 const VIDEO_MAX_WIDTH = 640;
 const MAX_MESSAGE_ITEMS = 120;
@@ -827,6 +827,11 @@ function togglePanel() {
 
 function capturePhoto() {
     const video = el.cameraFeed();
+    if (!video.videoWidth || !video.videoHeight) {
+        addAgentMessage('Camera frame is not ready yet. Wait a moment and try again.');
+        return;
+    }
+
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -834,7 +839,10 @@ function capturePhoto() {
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     const b64 = dataUrl.split(',')[1];
-    wsSend('video', b64);
+    if (!wsSend('video', b64)) {
+        addAgentMessage('Connection is not ready. Photo was not sent. Wait for reconnection and try again.');
+        return;
+    }
 
     // Flash effect
     const overlay = document.getElementById('camera-overlay');
@@ -845,7 +853,10 @@ function capturePhoto() {
 }
 
 function requestReport() {
-    wsSend('text', 'Generate an inspection report for this session');
+    if (!wsSend('text', 'Generate an inspection report for this session')) {
+        addAgentMessage('Connection is not ready. Report request was not sent. Wait for reconnection and try again.');
+        return;
+    }
     addUserMessage('📄 Requesting inspection report...');
 }
 
@@ -945,6 +956,10 @@ function addUserMessage(text) {
     container.scrollTop = container.scrollHeight;
 }
 
+function compactTranscriptText(text) {
+    return (text || '').replace(/\s+/g, '').trim().toLowerCase();
+}
+
 function addTranscript(speaker, text) {
     if (!text || !text.trim()) return;
     const container = el.agentMessages();
@@ -977,7 +992,16 @@ function addTranscript(speaker, text) {
         const textSpan = state.currentTranscriptEl.querySelector('.transcript-text');
         if (textSpan) {
             const current = textSpan.dataset.rawText || '';
-            const next = current ? `${current} ${text}` : text;
+            const currentCompact = compactTranscriptText(current);
+            const incomingCompact = compactTranscriptText(text);
+            let next = current ? `${current} ${text}` : text;
+            if (currentCompact && incomingCompact) {
+                if (incomingCompact === currentCompact || currentCompact.includes(incomingCompact)) {
+                    next = current;
+                } else if (incomingCompact.includes(currentCompact)) {
+                    next = text;
+                }
+            }
             textSpan.dataset.rawText = next;
             if (speaker === 'You') {
                 textSpan.textContent = ` ${next}`;

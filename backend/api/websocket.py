@@ -22,6 +22,7 @@ import logging
 import time
 import traceback
 from datetime import datetime
+from typing import Any
 
 from agent.tools.confirm_action import set_session_context
 from agent.tools.wrapper import get_tool_result_queue, remove_tool_result_queue
@@ -254,6 +255,23 @@ def _extract_media_cards(tool_result: object) -> list[dict]:
     return cards
 
 
+def _transcription_messages_for_event(event: Any) -> list[dict[str, Any]]:
+    """Build client transcript messages from ADK live transcription fields."""
+    messages: list[dict[str, Any]] = []
+    transcription_pairs = (
+        ("input_transcription", ws_messages.transcript_input_message),
+        ("output_transcription", ws_messages.transcript_output_message),
+    )
+
+    for attr_name, message_builder in transcription_pairs:
+        transcription = getattr(event, attr_name, None)
+        text = getattr(transcription, "text", None)
+        if isinstance(text, str) and text.strip():
+            messages.append(message_builder(text.strip()))
+
+    return messages
+
+
 async def _upload_session_frame(
     session_id: str,
     frame_data: bytes,
@@ -458,6 +476,9 @@ async def _run_bidi_session(
             ):
                 if not session.is_active:
                     break
+
+                for transcript_message in _transcription_messages_for_event(event):
+                    await websocket.send_json(transcript_message)
 
                 # --- Audio response from agent ---
                 if event.content and event.content.parts:
