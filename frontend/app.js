@@ -27,6 +27,7 @@ const state = {
     isPlayingAudio: false,
     isMicActive: true,
     isConnected: false,
+    isStartingInspection: false,
     isPanelExpanded: true,
     isStreamingVideo: false,
     videoInterval: null,
@@ -41,6 +42,7 @@ const state = {
     reconnectAttempts: 0,
     reconnectTimer: null,
     intentionalClose: false,
+    wsConnectToken: 0,
     pendingConfirmations: {},
 };
 
@@ -90,6 +92,29 @@ function setHudActive(active) {
 
 // ==================== CAMERA ====================
 
+function waitForVideoReady(video, timeoutMs = 2500) {
+    if (!video) return Promise.resolve(false);
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA || video.videoWidth > 0) {
+        return Promise.resolve(true);
+    }
+
+    return new Promise(resolve => {
+        let settled = false;
+        const finish = (ready) => {
+            if (settled) return;
+            settled = true;
+            video.removeEventListener('loadedmetadata', onReady);
+            video.removeEventListener('canplay', onReady);
+            clearTimeout(timer);
+            resolve(ready);
+        };
+        const onReady = () => finish(true);
+        const timer = setTimeout(() => finish(false), timeoutMs);
+        video.addEventListener('loadedmetadata', onReady, { once: true });
+        video.addEventListener('canplay', onReady, { once: true });
+    });
+}
+
 async function initCamera() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -107,7 +132,17 @@ async function initCamera() {
         });
 
         state.mediaStream = stream;
-        el.cameraFeed().srcObject = stream;
+        const video = el.cameraFeed();
+        video.srcObject = stream;
+        const videoReady = await waitForVideoReady(video);
+        try {
+            await video.play();
+        } catch (playErr) {
+            console.warn('[Camera] Video play failed:', playErr);
+        }
+        if (!videoReady && !video.videoWidth) {
+            console.warn('[Camera] Stream acquired, but video metadata is not ready yet');
+        }
         console.log('[Camera] Ready');
         return true;
     } catch (err) {
@@ -302,16 +337,27 @@ function stopVideoStreaming() {
 // ==================== WEBSOCKET ====================
 
 function connectWebSocket() {
+    if (state.ws && [WebSocket.CONNECTING, WebSocket.OPEN].includes(state.ws.readyState)) {
+        return;
+    }
+    clearTimeout(state.reconnectTimer);
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = getAuthToken();
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
-    const wsUrl = `${protocol}//${window.location.host}/ws/inspect/${state.userId}${tokenParam}`;
+    const sessionPath = state.sessionId
+        ? `${state.userId}/${encodeURIComponent(state.sessionId)}`
+        : state.userId;
+    const wsUrl = `${protocol}//${window.location.host}/ws/inspect/${sessionPath}${tokenParam}`;
 
     console.log('[WS] Connecting inspection socket');
     state.intentionalClose = false;
-    state.ws = new WebSocket(wsUrl);
+    const connectToken = ++state.wsConnectToken;
+    const ws = new WebSocket(wsUrl);
+    state.ws = ws;
 
-    state.ws.onopen = () => {
+    ws.onopen = () => {
+        if (state.ws !== ws || connectToken !== state.wsConnectToken) return;
         console.log('[WS] Connected');
         const wasRetry = state.reconnectAttempts > 0;
         state.isConnected = true;
@@ -327,11 +373,12 @@ function connectWebSocket() {
         }
 
         if (wasRetry && state.sessionStartTime) {
-            addAgentMessage('Connection retry complete. Live context and pending reviews may not be restored.');
+            addAgentMessage('Connection retry complete. Live context restored.');
         }
     };
 
-    state.ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
+        if (state.ws !== ws || connectToken !== state.wsConnectToken) return;
         try {
             const msg = JSON.parse(event.data);
             handleServerMessage(msg);
@@ -340,7 +387,8 @@ function connectWebSocket() {
         }
     };
 
-    state.ws.onclose = () => {
+    ws.onclose = () => {
+        if (state.ws !== ws || connectToken !== state.wsConnectToken) return;
         console.log('[WS] Disconnected');
         state.isConnected = false;
         stopAudioCapture();
@@ -353,7 +401,8 @@ function connectWebSocket() {
         }
     };
 
-    state.ws.onerror = (err) => {
+    ws.onerror = (err) => {
+        if (state.ws !== ws || connectToken !== state.wsConnectToken) return;
         console.error('[WS] Error:', err);
     };
 }
@@ -373,7 +422,9 @@ function attemptReconnect() {
 function wsSend(type, data) {
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
         state.ws.send(JSON.stringify({ type, data }));
+        return true;
     }
+    return false;
 }
 
 // ==================== MESSAGE HANDLER ====================
@@ -630,6 +681,9 @@ function formatActionType(type) {
 // ==================== UI ACTIONS ====================
 
 async function beginInspectionSession() {
+    if (state.isStartingInspection || state.sessionStartTime) return;
+    state.isStartingInspection = true;
+
     // Show feedback on splash screen while initializing
     const splashStatus = document.getElementById('splash-status');
     if (splashStatus) {
@@ -638,32 +692,37 @@ async function beginInspectionSession() {
         splashStatus.style.display = 'block';
     }
 
-    await initPlayback();
+    try {
+        await initPlayback();
 
-    const ready = await initCamera();
-    if (!ready) {
-        // Show error on splash screen (user can still see it)
-        if (splashStatus) {
-            splashStatus.textContent = 'Camera/mic access failed. Please allow permissions and try again.';
-            splashStatus.className = 'splash-status error';
+        const ready = await initCamera();
+        if (!ready) {
+            // Show error on splash screen (user can still see it)
+            if (splashStatus) {
+                splashStatus.textContent = 'Camera/mic access failed. Please allow permissions and try again.';
+                splashStatus.className = 'splash-status error';
+            }
+            return;
         }
-        return;
+
+        if (splashStatus) splashStatus.style.display = 'none';
+
+        if (window.CommandCenter) {
+            window.CommandCenter.syncSelectedAssetToInspection();
+        }
+
+        el.splashScreen().classList.remove('active');
+        el.inspectionScreen().classList.add('active');
+
+        state.sessionId = state.sessionId || `inspect-${crypto.randomUUID()}`;
+        state.sessionStartTime = Date.now();
+        state.timerInterval = setInterval(updateTimer, 1000);
+        state.hudInterval = setInterval(updateHudData, 1000);
+
+        connectWebSocket();
+    } finally {
+        state.isStartingInspection = false;
     }
-
-    if (splashStatus) splashStatus.style.display = 'none';
-
-    if (window.CommandCenter) {
-        window.CommandCenter.syncSelectedAssetToInspection();
-    }
-
-    el.splashScreen().classList.remove('active');
-    el.inspectionScreen().classList.add('active');
-
-    state.sessionStartTime = Date.now();
-    state.timerInterval = setInterval(updateTimer, 1000);
-    state.hudInterval = setInterval(updateHudData, 1000);
-
-    connectWebSocket();
 }
 
 async function startInspection() {
@@ -704,6 +763,7 @@ async function sendEndSessionAndFlush(timeoutMs = 500) {
 }
 
 async function endInspection() {
+    state.intentionalClose = true;
     await sendEndSessionAndFlush();
 
     stopVideoStreaming();
@@ -717,7 +777,6 @@ async function endInspection() {
         state.hudInterval = null;
     }
 
-    state.intentionalClose = true;
     clearTimeout(state.reconnectTimer);
     if (state.ws) {
         state.ws.close();
@@ -1088,13 +1147,18 @@ function base64ToArrayBuffer(base64) {
 
 const chatState = {
     ws: null,
+    sessionId: null,
     isConnected: false,
     isVoiceMode: false,
     attachedImageB64: null,
     recognition: null,  // Web Speech API
+    recognitionActive: false,
+    recognitionRestartTimer: null,
     reconnectAttempts: 0,
     reconnectTimer: null,
     intentionalClose: false,
+    pendingSends: [],
+    queueNoticeShown: false,
     pendingConfirmations: {},
 };
 
@@ -1160,25 +1224,37 @@ function closeChatPanel() {
 }
 
 function connectChatWebSocket() {
+    if (chatState.ws && [WebSocket.CONNECTING, WebSocket.OPEN].includes(chatState.ws.readyState)) {
+        return;
+    }
+    clearTimeout(chatState.reconnectTimer);
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const token = getAuthToken();
     const params = new URLSearchParams();
     if (token) params.set('token', token);
-    const wsUrl = `${protocol}//${window.location.host}/ws/chat/${state.userId}?${params}`;
+    chatState.sessionId = chatState.sessionId || `chat-${crypto.randomUUID()}`;
+    const query = params.toString();
+    const suffix = query ? `?${query}` : '';
+    const wsUrl = `${protocol}//${window.location.host}/ws/chat/${state.userId}/${encodeURIComponent(chatState.sessionId)}${suffix}`;
 
     console.log('[Chat WS] Connecting chat socket');
     chatState.intentionalClose = false;
-    chatState.ws = new WebSocket(wsUrl);
+    const ws = new WebSocket(wsUrl);
+    chatState.ws = ws;
 
-    chatState.ws.onopen = () => {
+    ws.onopen = () => {
+        if (chatState.ws !== ws) return;
         console.log('[Chat WS] Connected');
         chatState.isConnected = true;
         chatState.reconnectAttempts = 0;
         setChatStatus('Online');
         updateConnectionStatus('connected');
+        flushPendingChatSends();
     };
 
-    chatState.ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
+        if (chatState.ws !== ws) return;
         try {
             const msg = JSON.parse(event.data);
             handleChatServerMessage(msg);
@@ -1187,7 +1263,8 @@ function connectChatWebSocket() {
         }
     };
 
-    chatState.ws.onclose = () => {
+    ws.onclose = () => {
+        if (chatState.ws !== ws) return;
         console.log('[Chat WS] Disconnected');
         chatState.isConnected = false;
 
@@ -1200,7 +1277,8 @@ function connectChatWebSocket() {
         }
     };
 
-    chatState.ws.onerror = (err) => {
+    ws.onerror = (err) => {
+        if (chatState.ws !== ws) return;
         console.error('[Chat WS] Error:', err);
     };
 }
@@ -1219,6 +1297,55 @@ function attemptChatReconnect() {
 function chatWsSend(type, data) {
     if (chatState.ws && chatState.ws.readyState === WebSocket.OPEN) {
         chatState.ws.send(JSON.stringify({ type, data }));
+        return true;
+    }
+    return false;
+}
+
+function displaySentChatPayload(payload) {
+    if (payload.type === 'image' && payload.imageSrc) {
+        addChatImageMessage(payload.imageSrc);
+    }
+    if (payload.type === 'text' && payload.text) {
+        addChatMessage('user', payload.text);
+    }
+}
+
+function queueChatPayload(payload) {
+    chatState.pendingSends.push(payload);
+    setChatStatus('Reconnecting...');
+    if (!chatState.queueNoticeShown) {
+        addChatMessage('agent', 'Connection is reconnecting. I will send your message when it is back.');
+        chatState.queueNoticeShown = true;
+    }
+    connectChatWebSocket();
+}
+
+function sendOrQueueChatPayload(payload) {
+    if (chatWsSend(payload.type, payload.data)) {
+        displaySentChatPayload(payload);
+        return true;
+    }
+    queueChatPayload(payload);
+    return false;
+}
+
+function flushPendingChatSends() {
+    while (
+        chatState.pendingSends.length > 0
+        && chatState.ws
+        && chatState.ws.readyState === WebSocket.OPEN
+    ) {
+        const payload = chatState.pendingSends.shift();
+        if (chatWsSend(payload.type, payload.data)) {
+            displaySentChatPayload(payload);
+        } else {
+            chatState.pendingSends.unshift(payload);
+            break;
+        }
+    }
+    if (chatState.pendingSends.length === 0) {
+        chatState.queueNoticeShown = false;
     }
 }
 
@@ -1231,6 +1358,9 @@ function disconnectChat() {
         chatState.ws = null;
     }
     chatState.isConnected = false;
+    chatState.sessionId = null;
+    chatState.pendingSends = [];
+    chatState.queueNoticeShown = false;
     chatState.pendingConfirmations = {};
     updateConnectionStatus('disconnected');
 }
@@ -1287,6 +1417,19 @@ function handleChatServerMessage(msg) {
 
 // --- Chat Send ---
 
+function addChatImageMessage(imageSrc) {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = 'message user-message fade-in';
+    const img = document.createElement('img');
+    img.src = imageSrc;
+    img.className = 'chat-msg-img';
+    img.alt = 'Attached image';
+    div.appendChild(img);
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+}
+
 function sendChatMessage() {
     const input = document.getElementById('chat-input');
     const text = (input.value || '').trim();
@@ -1294,24 +1437,21 @@ function sendChatMessage() {
     closeChatImageSourcePicker();
 
     if (chatState.attachedImageB64) {
-        chatWsSend('image', chatState.attachedImageB64);
-        // Show thumbnail in chat
-        const container = document.getElementById('chat-messages');
-        const div = document.createElement('div');
-        div.className = 'message user-message fade-in';
-        const img = document.createElement('img');
-        img.src = document.getElementById('chat-preview-img').src;
-        img.className = 'chat-msg-img';
-        img.alt = 'Attached image';
-        div.appendChild(img);
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
+        const imageSrc = document.getElementById('chat-preview-img').src;
+        sendOrQueueChatPayload({
+            type: 'image',
+            data: chatState.attachedImageB64,
+            imageSrc,
+        });
         removeAttachedImage();
     }
 
     if (text) {
-        chatWsSend('text', text);
-        addChatMessage('user', text);
+        sendOrQueueChatPayload({
+            type: 'text',
+            data: text,
+            text,
+        });
         input.value = '';
     }
 }
@@ -1363,6 +1503,25 @@ function removeAttachedImage() {
 
 // --- Voice Mode (Web Speech API — browser-native speech-to-text) ---
 
+function startChatRecognition() {
+    const recognition = chatState.recognition;
+    if (!chatState.isVoiceMode || !recognition || chatState.recognitionActive) return;
+    try {
+        recognition.start();
+    } catch (err) {
+        console.warn('[Voice] Recognition start skipped:', err);
+    }
+}
+
+function scheduleChatRecognitionRestart(delayMs = 250) {
+    clearTimeout(chatState.recognitionRestartTimer);
+    if (!chatState.isVoiceMode || !chatState.recognition) return;
+    chatState.recognitionRestartTimer = setTimeout(() => {
+        chatState.recognitionRestartTimer = null;
+        startChatRecognition();
+    }, delayMs);
+}
+
 function toggleChatVoice() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -1382,6 +1541,12 @@ function toggleChatVoice() {
 
         const input = document.getElementById('chat-input');
 
+        chatState.recognition.onstart = () => {
+            chatState.recognitionActive = true;
+            setChatStatus('Listening...');
+            input.placeholder = 'Listening... speak now';
+        };
+
         chatState.recognition.onresult = (event) => {
             let transcript = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -1391,38 +1556,32 @@ function toggleChatVoice() {
             // Auto-send on final result
             if (event.results[event.results.length - 1].isFinal) {
                 sendChatMessage();
-                // Restart listening
-                if (chatState.isVoiceMode) {
-                    setTimeout(() => {
-                        try { chatState.recognition.start(); } catch (e) { /* already started */ }
-                    }, 300);
-                }
             }
         };
 
         chatState.recognition.onerror = (event) => {
             console.warn('[Voice] Recognition error:', event.error);
+            chatState.recognitionActive = false;
             if (event.error === 'not-allowed') {
                 addChatMessage('agent', 'Microphone access denied. Please allow mic permissions.');
                 stopChatVoice();
+            } else if (event.error === 'audio-capture') {
+                addChatMessage('agent', 'Microphone is unavailable. Check browser and device permissions.');
+                stopChatVoice();
+            } else if (chatState.isVoiceMode) {
+                setChatStatus('Listening...');
             }
         };
 
         chatState.recognition.onend = () => {
+            chatState.recognitionActive = false;
             // Restart if still in voice mode (recognition auto-stops after silence)
             if (chatState.isVoiceMode) {
-                try { chatState.recognition.start(); } catch (e) { /* ignore */ }
+                scheduleChatRecognitionRestart();
             }
         };
 
-        try {
-            chatState.recognition.start();
-            setChatStatus('Listening...');
-            input.placeholder = 'Listening... speak now';
-        } catch (err) {
-            console.error('[Voice] Start failed:', err);
-            stopChatVoice();
-        }
+        startChatRecognition();
     } else {
         stopChatVoice();
     }
@@ -1430,6 +1589,9 @@ function toggleChatVoice() {
 
 function stopChatVoice() {
     chatState.isVoiceMode = false;
+    chatState.recognitionActive = false;
+    clearTimeout(chatState.recognitionRestartTimer);
+    chatState.recognitionRestartTimer = null;
     const btn = document.getElementById('btn-chat-voice');
     if (btn) btn.classList.remove('active');
     if (chatState.recognition) {

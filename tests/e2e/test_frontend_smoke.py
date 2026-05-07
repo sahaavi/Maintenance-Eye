@@ -147,7 +147,61 @@ def install_media_mocks(page: Page, include_websocket: bool = False) -> None:
             }}
           }};
         }};
+        Object.defineProperty(HTMLMediaElement.prototype, 'videoWidth', {{
+          configurable: true,
+          get() {{ return this.id === 'camera-feed' ? 1280 : 0; }}
+        }});
+        Object.defineProperty(HTMLMediaElement.prototype, 'videoHeight', {{
+          configurable: true,
+          get() {{ return this.id === 'camera-feed' ? 720 : 0; }}
+        }});
+        HTMLMediaElement.prototype.play = async function () {{
+          this.dispatchEvent(new Event('loadedmetadata'));
+        }};
         {websocket_script if include_websocket else ""}
+        """
+    )
+
+
+def install_speech_recognition_mock(page: Page) -> None:
+    page.add_init_script(
+        """
+        window.__recognitions = [];
+        window.__recognitionStartCalls = 0;
+        class FakeSpeechRecognition {
+          constructor() {
+            this.continuous = false;
+            this.interimResults = false;
+            this.lang = 'en-US';
+            this.started = false;
+            window.__recognitions.push(this);
+          }
+          start() {
+            window.__recognitionStartCalls += 1;
+            if (this.started) throw new Error('recognition already started');
+            this.started = true;
+            if (this.onstart) this.onstart();
+          }
+          stop() {
+            const wasStarted = this.started;
+            this.started = false;
+            if (wasStarted && this.onend) this.onend();
+          }
+          emitFinal(text) {
+            const result = [{ transcript: text }];
+            result.isFinal = true;
+            if (this.onresult) this.onresult({ resultIndex: 0, results: [result] });
+            this.started = false;
+            if (this.onend) this.onend();
+          }
+        }
+        window.SpeechRecognition = FakeSpeechRecognition;
+        window.webkitSpeechRecognition = FakeSpeechRecognition;
+        window.__emitVoiceFinal = (text) => {
+          const recognition = window.__recognitions[window.__recognitions.length - 1];
+          if (!recognition) throw new Error('No recognition instance');
+          recognition.emitFinal(text);
+        };
         """
     )
 
@@ -208,6 +262,91 @@ def test_chat_panel_toggle(page: Page, static_server: str) -> None:
 
     page.locator("#chat-panel .btn-icon").first.click()
     assert page.locator("#chat-panel").is_hidden()
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_chat_voice_sends_multiple_final_transcripts(page: Page, static_server: str) -> None:
+    route_demo_api(page)
+    install_media_mocks(page, include_websocket=True)
+    install_speech_recognition_mock(page)
+
+    page.goto(static_server, wait_until="domcontentloaded", timeout=SETTINGS.e2e_timeout_ms)
+    page.get_by_test_id("open-chat").click()
+    page.locator("#chat-panel").wait_for(state="visible", timeout=SETTINGS.e2e_timeout_ms)
+    page.locator("#btn-chat-voice").click()
+
+    page.evaluate("window.__emitVoiceFinal('first envelope sentence')")
+    page.wait_for_timeout(350)
+    page.evaluate("window.__emitVoiceFinal('second question')")
+
+    page.wait_for_function(
+        """
+        () => window.__wsMessages.filter((msg) => msg.type === 'text').length === 2
+        """,
+        timeout=SETTINGS.e2e_timeout_ms,
+    )
+    sent_texts = page.evaluate(
+        "window.__wsMessages.filter((msg) => msg.type === 'text').map((msg) => msg.data)"
+    )
+    assert sent_texts == ["first envelope sentence", "second question"]
+    assert page.evaluate("window.__recognitionStartCalls") >= 2
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_chat_voice_queues_transcript_until_socket_opens(page: Page, static_server: str) -> None:
+    route_demo_api(page)
+    install_speech_recognition_mock(page)
+    page.add_init_script(
+        """
+        window.__wsMessages = [];
+        window.__wsInstances = [];
+        class ControlledWebSocket {
+          constructor(url) {
+            this.url = url;
+            this.readyState = ControlledWebSocket.CONNECTING;
+            window.__wsInstances.push(this);
+          }
+          open() {
+            this.readyState = ControlledWebSocket.OPEN;
+            if (this.onopen) this.onopen();
+          }
+          send(payload) { window.__wsMessages.push(JSON.parse(payload)); }
+          close() {
+            this.readyState = ControlledWebSocket.CLOSED;
+            if (this.onclose) this.onclose({ code: 1000 });
+          }
+        }
+        ControlledWebSocket.CONNECTING = 0;
+        ControlledWebSocket.OPEN = 1;
+        ControlledWebSocket.CLOSING = 2;
+        ControlledWebSocket.CLOSED = 3;
+        window.WebSocket = ControlledWebSocket;
+        """
+    )
+
+    page.goto(static_server, wait_until="domcontentloaded", timeout=SETTINGS.e2e_timeout_ms)
+    page.get_by_test_id("open-chat").click()
+    page.locator("#chat-panel").wait_for(state="visible", timeout=SETTINGS.e2e_timeout_ms)
+    page.locator("#btn-chat-voice").click()
+    page.evaluate("window.__emitVoiceFinal('second question')")
+
+    assert page.evaluate("window.__wsMessages.length") == 0
+    assert page.evaluate("window.chatState.pendingSends.length") == 1
+    assert "Connection is reconnecting" in page.locator("#chat-messages").inner_text()
+
+    page.evaluate("window.__wsInstances[0].open()")
+    page.wait_for_function(
+        "() => window.__wsMessages.some((msg) => msg.type === 'text')",
+        timeout=SETTINGS.e2e_timeout_ms,
+    )
+    sent_texts = page.evaluate(
+        "window.__wsMessages.filter((msg) => msg.type === 'text').map((msg) => msg.data)"
+    )
+    assert sent_texts == ["second question"]
+    assert page.evaluate("window.chatState.pendingSends.length") == 0
+    assert page.locator("#chat-messages").get_by_text("second question").is_visible()
 
 
 @pytest.mark.e2e
@@ -326,6 +465,104 @@ def test_inspection_start_sends_top_level_asset_id(page: Page, static_server: st
     )
     assert start_messages[0] == {"type": "start_session", "asset_id": "AHU-07"}
     assert "data" not in start_messages[0]
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_start_inspection_ignores_duplicate_start_while_media_pending(
+    page: Page, static_server: str
+) -> None:
+    route_demo_api(page)
+    page.add_init_script(
+        """
+        window.__mediaCalls = 0;
+        window.__wsMessages = [];
+        window.__wsUrls = [];
+        window.__resolveMedia = null;
+        Object.defineProperty(navigator, 'mediaDevices', {
+          configurable: true,
+          value: {
+            getUserMedia: async () => {
+              window.__mediaCalls += 1;
+              return new Promise((resolve) => {
+                window.__resolveMedia = () => {
+                  const stream = new MediaStream();
+                  stream.getTracks = () => [{ stop() {} }];
+                  stream.getAudioTracks = () => [{ stop() {}, enabled: true }];
+                  stream.getVideoTracks = () => [{ stop() {}, enabled: true }];
+                  resolve(stream);
+                };
+              });
+            }
+          }
+        });
+        window.AudioContext = window.webkitAudioContext = function () {
+          return {
+            state: 'running',
+            close() {},
+            resume() {},
+            createMediaStreamSource() { return { connect() {} }; },
+            createScriptProcessor() {
+              return { connect() {}, disconnect() {}, onaudioprocess: null };
+            },
+            createBuffer() { return { getChannelData() { return new Float32Array(1); } }; },
+            createBufferSource() {
+              return { connect() {}, start() {}, stop() {}, onended: null };
+            }
+          };
+        };
+        Object.defineProperty(HTMLMediaElement.prototype, 'videoWidth', {
+          configurable: true,
+          get() { return this.id === 'camera-feed' ? 1280 : 0; }
+        });
+        Object.defineProperty(HTMLMediaElement.prototype, 'videoHeight', {
+          configurable: true,
+          get() { return this.id === 'camera-feed' ? 720 : 0; }
+        });
+        HTMLMediaElement.prototype.play = async function () {
+          this.dispatchEvent(new Event('loadedmetadata'));
+        };
+        class FakeWebSocket {
+          constructor(url) {
+            this.url = url;
+            this.readyState = FakeWebSocket.CONNECTING;
+            window.__wsUrls.push(url);
+            setTimeout(() => {
+              this.readyState = FakeWebSocket.OPEN;
+              if (this.onopen) this.onopen();
+            }, 0);
+          }
+          send(payload) { window.__wsMessages.push(JSON.parse(payload)); }
+          close() {
+            this.readyState = FakeWebSocket.CLOSED;
+            if (this.onclose) this.onclose({ code: 1000 });
+          }
+        }
+        FakeWebSocket.CONNECTING = 0;
+        FakeWebSocket.OPEN = 1;
+        FakeWebSocket.CLOSING = 2;
+        FakeWebSocket.CLOSED = 3;
+        window.WebSocket = FakeWebSocket;
+        """
+    )
+
+    page.goto(static_server, wait_until="networkidle", timeout=SETTINGS.e2e_timeout_ms)
+    page.get_by_test_id("start-inspection").click()
+    page.get_by_test_id("asset-option-AHU-07").click()
+    page.get_by_test_id("confirm-asset-selection").click()
+    page.get_by_test_id("start-inspection").click()
+    page.evaluate("window.__resolveMedia()")
+
+    page.wait_for_function(
+        "() => window.__wsMessages.some((msg) => msg.type === 'start_session')",
+        timeout=SETTINGS.e2e_timeout_ms,
+    )
+    assert page.evaluate("window.__mediaCalls") == 1
+    assert page.evaluate("window.__wsUrls.length") == 1
+    start_messages = page.evaluate(
+        "window.__wsMessages.filter((msg) => msg.type === 'start_session')"
+    )
+    assert len(start_messages) == 1
 
 
 @pytest.mark.e2e

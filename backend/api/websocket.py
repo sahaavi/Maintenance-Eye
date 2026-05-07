@@ -440,10 +440,12 @@ async def _run_bidi_session(
                             await websocket.send_json(ws_messages.media_card_message(card))
 
                         tool_queue.task_done()
-                    except TimeoutError:
+                    except (TimeoutError, asyncio.TimeoutError):  # noqa: UP041 - Python 3.10 compatibility
                         continue
+                    except asyncio.CancelledError:
+                        raise
             except Exception as e:
-                logger.error(f"Side channel error: {e}")
+                logger.error(f"Side channel error: {e!r}")
 
         side_task = asyncio.create_task(side_channel_task())
 
@@ -599,9 +601,11 @@ async def inspection_websocket(
 
 
 @router.websocket("/ws/chat/{user_id}")
+@router.websocket("/ws/chat/{user_id}/{session_id}")
 async def chat_websocket(
     websocket: WebSocket,
     user_id: str,
+    session_id: str = "",
 ) -> None:
     """
     WebSocket endpoint for text/image chat using a standard text model.
@@ -631,7 +635,8 @@ async def chat_websocket(
 
     from main import CHAT_APP_NAME, chat_runner, chat_session_service
 
-    session_id = f"chat-{id(websocket)}"
+    if not session_id:
+        session_id = f"chat-{id(websocket)}"
     resolved_user_id = auth_ctx.uid if auth_ctx and auth_ctx.uid else user_id
 
     set_session_context(session_id)
