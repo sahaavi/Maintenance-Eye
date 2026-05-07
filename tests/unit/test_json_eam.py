@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from models.schemas import Priority, WorkOrder, WorkOrderStatus  # type: ignore[import-not-found]
+from models.schemas import (  # type: ignore[import-not-found]
+    AssetStatus,
+    Priority,
+    WorkOrder,
+    WorkOrderStatus,
+)
 from services.json_eam import JsonEAM  # type: ignore[import-not-found]
 
 
@@ -54,6 +59,36 @@ async def test_json_eam_returns_work_orders_latest_first_for_demo_asset() -> Non
     results = await eam.get_work_orders(asset_id="ESC-SC-003", status=WorkOrderStatus.OPEN)
 
     assert [wo.wo_id for wo in results[:2]] == ["WO-2026-0152", "WO-2026-0151"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_json_eam_switch_machine_demo_state_has_active_work_orders() -> None:
+    eam = JsonEAM()
+
+    switch_machines = await eam.search_assets(
+        department="guideway",
+        asset_type="switch_machine",
+    )
+
+    assert {asset.asset_id for asset in switch_machines} == {
+        "SWM-RO-001",
+        "SWM-GW-002",
+        "SWM-LC-003",
+        "SWM-RO-004",
+    }
+    assert {asset.status for asset in switch_machines} == {AssetStatus.OPERATIONAL}
+
+    active_statuses = {WorkOrderStatus.OPEN, WorkOrderStatus.IN_PROGRESS}
+    for asset in switch_machines:
+        work_orders = await eam.get_work_orders(asset_id=asset.asset_id)
+        assert any(wo.status in active_statuses for wo in work_orders), asset.asset_id
+
+    gateway_orders = await eam.get_work_orders(
+        asset_id="SWM-GW-002",
+        status=WorkOrderStatus.IN_PROGRESS,
+    )
+    assert [wo.wo_id for wo in gateway_orders] == ["WO-2026-0174"]
 
 
 @pytest.mark.unit

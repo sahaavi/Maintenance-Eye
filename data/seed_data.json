@@ -1482,7 +1482,7 @@
         "Switch Machine #1"
       ],
       "last_inspection": "2025-09-07",
-      "status": "degraded"
+      "status": "operational"
     },
     {
       "asset_id": "SWM-GW-002",
@@ -1536,7 +1536,7 @@
         "Switch Machine #3"
       ],
       "last_inspection": "2025-12-24",
-      "status": "degraded"
+      "status": "operational"
     },
     {
       "asset_id": "SWM-RO-004",
@@ -1563,7 +1563,7 @@
         "Switch Machine #4"
       ],
       "last_inspection": "2026-01-25",
-      "status": "degraded"
+      "status": "operational"
     },
     {
       "asset_id": "RAL-WF-001",
@@ -7786,6 +7786,26 @@
         "Incident 2026-277468 \u2014 20:12 @ LHO | Consist: 230/229 | MK II 1100/1200",
         "HMP A7 BITE error 17 \u2014 same error code as morning incident at ICI",
         "Recurring BITE 17 on V229 \u2014 VOBC inspection required"
+      ]
+    },
+    {
+      "wo_id": "WO-2026-0174",
+      "asset_id": "SWM-GW-002",
+      "status": "in_progress",
+      "priority": "P3",
+      "problem_code": "ME-007",
+      "fault_code": "CTRL-SNS",
+      "action_code": "ADJUST",
+      "failure_class": "MECHANICAL",
+      "description": "Demo corrective maintenance for Gateway Switch Machine #2 alignment verification",
+      "created_by": "maintenance-eye-agent",
+      "created_at": "2026-05-07T00:00:00",
+      "assigned_to": "Guideway Response Crew",
+      "photos": [],
+      "ai_confidence": 0.88,
+      "technician_confirmed": true,
+      "notes": [
+        "Demo work order added to keep Gateway switch machine visible in active work queue"
       ]
     }
   ],
