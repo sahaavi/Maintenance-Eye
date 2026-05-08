@@ -42,6 +42,7 @@ const state = {
     reconnectAttempts: 0,
     reconnectTimer: null,
     intentionalClose: false,
+    fatalLiveApiError: false,
     wsConnectToken: 0,
     pendingConfirmations: {},
 };
@@ -58,6 +59,9 @@ const VIDEO_MAX_WIDTH = 640;
 const MAX_MESSAGE_ITEMS = 120;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_BASE_DELAY = 1000; // 1s, 2s, 4s, max 8s
+const FATAL_LIVE_API_CAMERA_MESSAGE =
+    'Camera streaming paused because the live inspection service rejected a camera frame. ' +
+    'Check that the camera view is visible, then tap the connection status to retry.';
 
 // ==================== DOM ELEMENTS ====================
 
@@ -300,6 +304,41 @@ async function stopPlayback() {
 
 // ==================== VIDEO STREAMING (Camera → JPEG → WS) ====================
 
+function hasValidVideoDimensions(video) {
+    return Boolean(
+        video
+        && Number.isFinite(video.videoWidth)
+        && Number.isFinite(video.videoHeight)
+        && video.videoWidth > 0
+        && video.videoHeight > 0
+    );
+}
+
+function extractJpegBase64(dataUrl) {
+    const prefix = 'data:image/jpeg;base64,';
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith(prefix)) {
+        return '';
+    }
+    return dataUrl.slice(prefix.length).trim();
+}
+
+function captureVideoFrameBase64(video, canvas, ctx, quality = VIDEO_QUALITY) {
+    if (!hasValidVideoDimensions(video) || !canvas || !ctx) return '';
+
+    const scale = Math.min(1, VIDEO_MAX_WIDTH / video.videoWidth);
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    if (canvas.width <= 0 || canvas.height <= 0) return '';
+
+    try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return extractJpegBase64(canvas.toDataURL('image/jpeg', quality));
+    } catch (err) {
+        console.warn('[Video] Frame capture skipped:', err);
+        return '';
+    }
+}
+
 function startVideoStreaming() {
     if (state.isStreamingVideo) return;
     state.isStreamingVideo = true;
@@ -309,17 +348,9 @@ function startVideoStreaming() {
     const ctx = canvas.getContext('2d');
 
     state.videoInterval = setInterval(() => {
-        if (!state.isConnected || !video.videoWidth) return;
-
-        // Scale down for bandwidth
-        const scale = Math.min(1, VIDEO_MAX_WIDTH / video.videoWidth);
-        canvas.width = video.videoWidth * scale;
-        canvas.height = video.videoHeight * scale;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        // JPEG → base64 (strip data URL prefix)
-        const dataUrl = canvas.toDataURL('image/jpeg', VIDEO_QUALITY);
-        const b64 = dataUrl.split(',')[1];
+        if (!state.isConnected) return;
+        const b64 = captureVideoFrameBase64(video, canvas, ctx);
+        if (!b64) return;
         wsSend('video', b64);
     }, 1000 / VIDEO_FPS);
 
@@ -372,6 +403,7 @@ function connectWebSocket() {
             window.CommandCenter.sendInspectionStartContext();
         }
 
+        state.fatalLiveApiError = false;
         if (wasRetry && state.sessionStartTime) {
             addAgentMessage('Connection retry complete. Live context restored.');
         }
@@ -394,6 +426,7 @@ function connectWebSocket() {
         stopAudioCapture();
         stopVideoStreaming();
 
+        if (state.fatalLiveApiError) return;
         if (!state.intentionalClose) {
             attemptReconnect();
         } else {
@@ -428,6 +461,43 @@ function wsSend(type, data) {
 }
 
 // ==================== MESSAGE HANDLER ====================
+
+function errorDataToText(data) {
+    if (typeof data === 'string') return data;
+    try {
+        return JSON.stringify(data ?? '');
+    } catch (err) {
+        return String(data ?? '');
+    }
+}
+
+function isFatalLiveApiInvalidArgument(data) {
+    const text = errorDataToText(data).toLowerCase();
+    const hasInvalidArgument = text.includes('invalid argument')
+        || text.includes('invalid_argument')
+        || text.includes('invalid-argument');
+    return text.includes('live api') && (text.includes('1007') || hasInvalidArgument);
+}
+
+function handleFatalLiveApiInvalidArgument() {
+    if (state.fatalLiveApiError) return true;
+
+    state.fatalLiveApiError = true;
+    state.intentionalClose = true;
+    state.isConnected = false;
+    state.reconnectAttempts = 0;
+    clearTimeout(state.reconnectTimer);
+    stopVideoStreaming();
+    stopAudioCapture();
+    updateConnectionStatus('failed');
+    setAgentStatus('Camera paused');
+    addAgentMessage(FATAL_LIVE_API_CAMERA_MESSAGE);
+
+    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        state.ws.close();
+    }
+    return true;
+}
 
 function handleServerMessage(msg) {
     switch (msg.type) {
@@ -504,6 +574,10 @@ function handleServerMessage(msg) {
             break;
 
         case 'error':
+            if (isFatalLiveApiInvalidArgument(msg.data)) {
+                handleFatalLiveApiInvalidArgument();
+                break;
+            }
             addAgentMessage(`⚠️ ${msg.data}`);
             break;
 
@@ -789,6 +863,7 @@ async function endInspection() {
     // Reset
     state.sessionId = null;
     state.sessionStartTime = null;
+    state.fatalLiveApiError = false;
     el.agentMessages().innerHTML = `
         <div class="message agent-message">
             <p>Ready for inspection. What equipment are we looking at today?</p>
@@ -827,18 +902,17 @@ function togglePanel() {
 
 function capturePhoto() {
     const video = el.cameraFeed();
-    if (!video.videoWidth || !video.videoHeight) {
+    if (!hasValidVideoDimensions(video)) {
         addAgentMessage('Camera frame is not ready yet. Wait a moment and try again.');
         return;
     }
 
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    const b64 = dataUrl.split(',')[1];
+    const b64 = captureVideoFrameBase64(video, canvas, canvas.getContext('2d'), 0.85);
+    if (!b64) {
+        addAgentMessage('Camera frame is not ready yet. Wait a moment and try again.');
+        return;
+    }
     if (!wsSend('video', b64)) {
         addAgentMessage('Connection is not ready. Photo was not sent. Wait for reconnection and try again.');
         return;
@@ -1123,6 +1197,8 @@ function updateConnectionStatus(status) {
             textEl.textContent = 'Connection lost. Tap to retry.';
             statusEl.onclick = () => {
                 if (!state.isConnected && typeof window.connectWebSocket === 'function') {
+                    state.fatalLiveApiError = false;
+                    state.intentionalClose = false;
                     state.reconnectAttempts = 0;
                     window.connectWebSocket();
                 }

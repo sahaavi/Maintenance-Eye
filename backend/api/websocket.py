@@ -17,6 +17,7 @@ Supports:
 
 import asyncio
 import base64
+import binascii
 import json
 import logging
 import time
@@ -47,6 +48,8 @@ active_connections: set[WebSocket] = set()
 # Audio configuration
 SEND_SAMPLE_RATE = 16000  # Phone → server (PCM 16kHz mono 16-bit)
 RECEIVE_SAMPLE_RATE = 24000  # Server → phone (PCM 24kHz mono 16-bit)
+MIN_JPEG_FRAME_BYTES = 128
+MAX_JPEG_FRAME_BYTES = 2_000_000
 
 
 class InspectionSession:
@@ -71,6 +74,38 @@ class InspectionSession:
 
 # Active sessions
 active_sessions: dict[str, InspectionSession] = {}
+
+
+def _decode_valid_jpeg_frame(payload: object) -> bytes | None:
+    """
+    Decode the current frontend's base64 JPEG wire format.
+
+    The Live API is strict about media blobs, so reject empty, malformed,
+    non-JPEG, and trivially tiny JPEG-looking payloads before forwarding.
+    """
+    if not isinstance(payload, str) or not payload.strip():
+        return None
+
+    encoded = payload.strip()
+    if encoded.startswith("data:"):
+        metadata, separator, encoded_data = encoded.partition(",")
+        if separator != "," or "image/jpeg" not in metadata.lower():
+            return None
+        encoded = encoded_data.strip()
+        if not encoded:
+            return None
+
+    try:
+        frame_data = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+
+    if not MIN_JPEG_FRAME_BYTES <= len(frame_data) <= MAX_JPEG_FRAME_BYTES:
+        return None
+    if not frame_data.startswith(b"\xff\xd8") or not frame_data.endswith(b"\xff\xd9"):
+        return None
+
+    return frame_data
 
 
 def _extract_confirmation_request(tool_result: object) -> dict | None:
@@ -377,8 +412,17 @@ async def _run_bidi_session(
                     live_request_queue.send_realtime(audio_blob)
 
                 elif msg_type in ("video", "image"):
-                    # Decode base64 JPEG frame/image and send to Live API
-                    frame_data = base64.b64decode(message["data"])
+                    frame_data = _decode_valid_jpeg_frame(message.get("data"))
+                    if frame_data is None:
+                        logger.warning("Dropping invalid %s frame: %s", msg_type, session_id)
+                        if msg_type == "image":
+                            await websocket.send_json(
+                                ws_messages.error_message(
+                                    "Invalid image payload: expected JPEG image data"
+                                )
+                            )
+                        continue
+
                     video_blob = types.Blob(
                         mime_type="image/jpeg",
                         data=frame_data,

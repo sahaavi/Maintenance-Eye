@@ -206,6 +206,40 @@ def install_speech_recognition_mock(page: Page) -> None:
     )
 
 
+def install_controlled_inspection_websocket(page: Page) -> None:
+    page.add_init_script(
+        """
+        window.__wsMessages = [];
+        window.__wsInstances = [];
+        class ControlledInspectionWebSocket {
+          constructor(url) {
+            this.url = url;
+            this.readyState = ControlledInspectionWebSocket.CONNECTING;
+            window.__wsInstances.push(this);
+            setTimeout(() => this.open(), 0);
+          }
+          open() {
+            this.readyState = ControlledInspectionWebSocket.OPEN;
+            if (this.onopen) this.onopen();
+          }
+          send(payload) { window.__wsMessages.push(JSON.parse(payload)); }
+          emit(message) {
+            if (this.onmessage) this.onmessage({ data: JSON.stringify(message) });
+          }
+          close(code = 1006) {
+            this.readyState = ControlledInspectionWebSocket.CLOSED;
+            if (this.onclose) this.onclose({ code });
+          }
+        }
+        ControlledInspectionWebSocket.CONNECTING = 0;
+        ControlledInspectionWebSocket.OPEN = 1;
+        ControlledInspectionWebSocket.CLOSING = 2;
+        ControlledInspectionWebSocket.CLOSED = 3;
+        window.WebSocket = ControlledInspectionWebSocket;
+        """
+    )
+
+
 @pytest.fixture(scope="module")
 def static_server() -> str:
     root = Path(__file__).resolve().parents[2]
@@ -465,6 +499,109 @@ def test_inspection_start_sends_top_level_asset_id(page: Page, static_server: st
     )
     assert start_messages[0] == {"type": "start_session", "asset_id": "AHU-07"}
     assert "data" not in start_messages[0]
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_video_streaming_skips_empty_jpeg_payloads(page: Page, static_server: str) -> None:
+    route_demo_api(page)
+    install_media_mocks(page)
+    install_controlled_inspection_websocket(page)
+    page.add_init_script(
+        """
+        CanvasRenderingContext2D.prototype.drawImage = function () {};
+        HTMLCanvasElement.prototype.toDataURL = function () {
+          return 'data:image/jpeg;base64,';
+        };
+        """
+    )
+
+    page.goto(static_server, wait_until="domcontentloaded", timeout=SETTINGS.e2e_timeout_ms)
+    page.evaluate(
+        """
+        const video = document.getElementById('camera-feed');
+        Object.defineProperty(video, 'videoWidth', { configurable: true, value: 1280 });
+        Object.defineProperty(video, 'videoHeight', { configurable: true, value: 720 });
+        """
+    )
+    page.evaluate("window.beginInspectionSession()")
+    page.wait_for_function(
+        "() => window.state?.isStreamingVideo === true",
+        timeout=SETTINGS.e2e_timeout_ms,
+    )
+    page.wait_for_timeout(1200)
+
+    video_messages = page.evaluate(
+        "window.__wsMessages.filter((message) => message.type === 'video')"
+    )
+    assert video_messages == []
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_live_api_invalid_argument_error_stops_streaming_and_reconnect(
+    page: Page, static_server: str
+) -> None:
+    route_demo_api(page)
+    install_media_mocks(page)
+    install_controlled_inspection_websocket(page)
+    page.add_init_script(
+        """
+        CanvasRenderingContext2D.prototype.drawImage = function () {};
+        HTMLCanvasElement.prototype.toDataURL = function () {
+          return 'data:image/jpeg;base64,validframe';
+        };
+        """
+    )
+
+    page.goto(static_server, wait_until="domcontentloaded", timeout=SETTINGS.e2e_timeout_ms)
+    page.evaluate("window.beginInspectionSession()")
+    page.wait_for_function(
+        "() => window.state?.isStreamingVideo === true",
+        timeout=SETTINGS.e2e_timeout_ms,
+    )
+    page.evaluate(
+        """
+        window.__wsInstances[0].emit({
+          type: 'error',
+          data: 'Live API 1007 invalid argument: empty image content'
+        });
+        window.__wsInstances[0].close(1006);
+        """
+    )
+    page.wait_for_timeout(100)
+
+    messages = page.locator("#agent-messages").inner_text()
+    assert "Camera streaming paused" in messages
+    assert "1007" not in messages
+    assert "invalid argument" not in messages.lower()
+    assert page.evaluate("window.state.isStreamingVideo") is False
+    assert page.evaluate("window.state.reconnectAttempts") == 0
+    assert page.evaluate("window.__wsInstances.length") == 1
+
+
+@pytest.mark.e2e
+@pytest.mark.slow
+def test_nonfatal_inspection_socket_close_schedules_reconnect(
+    page: Page, static_server: str
+) -> None:
+    route_demo_api(page)
+    install_media_mocks(page)
+    install_controlled_inspection_websocket(page)
+
+    page.goto(static_server, wait_until="domcontentloaded", timeout=SETTINGS.e2e_timeout_ms)
+    page.evaluate("window.beginInspectionSession()")
+    page.wait_for_function(
+        "() => window.state?.isConnected === true",
+        timeout=SETTINGS.e2e_timeout_ms,
+    )
+    page.evaluate("window.__wsInstances[0].close(1006)")
+
+    page.wait_for_function(
+        "() => window.state?.reconnectAttempts === 1",
+        timeout=SETTINGS.e2e_timeout_ms,
+    )
+    assert "Reconnecting..." in page.locator("#connection-status").inner_text()
 
 
 @pytest.mark.e2e
